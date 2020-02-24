@@ -24,8 +24,6 @@ Atom = qualid
      | '(' Exp ',' Exp ')'
 FunCall = id '(' [ ActArgs ] ')'
 ActArgs = Exp ( ',' Exp )*
-int = [ '-' ] digit+
-id = alpha ( '_' | alphanumeric )*
 
 
 
@@ -35,7 +33,6 @@ Arith_n =
         | Arith_n Opl_n Arith_{n-1}
         | Op1_n Arith_n
         | Arith_{n-1}
-
 Opl_n = Opl WITH prio(Opl) == n
 Opr_n = Opr WITH prio(Opr) == n
 Op1_n = Op1 WITH prio(Op1) == n
@@ -47,7 +44,23 @@ Op1 = '!' | '-'
 
 Arith_0 = Atom
 
-/* ADJUSTMENTS */
+/***************   TOKENS    ****************/
+int = [ '-' ] digit+
+id = alpha ( '_' | alphanumeric )*
+keys:
+'var' 'Void' 'Int' 'Bool' 'Char' 'if' 'else' 'while' 'return' 'hd' 'tl' 'fst'
+'snd' 'False' 'True' 
+';' '(' ')' '{' '}' ']' ',' '.' 
+'&&' '||' '+' '*' '%' 
+'<': '<='
+'>': '>='
+'!': '!='
+'=': '=='
+'[': '[]'
+':': '::'
+'-': '->' (int)
+
+/*************** ADJUSTMENTS ****************/
 
 // Op2 = '+' | '-' | '*' | '%'
        | '==' | '<' | '>' | '<=' | '>=' | '!='
