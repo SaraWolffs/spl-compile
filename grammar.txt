@@ -1,0 +1,65 @@
+SPL = Decl+
+Decl = VarDecl | FunDecl
+VarDecl = ('var' | Type) id '=' Exp ';'
+FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] '{' VarDecl* Stmt+ '}'
+RetType = Type | 'Void'
+FunType = Type* '->' RetType
+Type = BType | '(' Type ',' Type ')' | '[' Type ']' | id
+BType = 'Int' | 'Bool' | 'Char'
+FArgs = id (',' id)*
+Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
+     | 'while '(' Exp ')' Compound
+     | qualid '=' Exp ';'
+     | FunCall ';'
+     | 'return' [ Exp ] ';'
+Compound = '{' Stmt* '}'
+Selector = 'hd' | 'tl' | 'fst' | 'snd'
+qualid = id ('.' Selector)*
+Exp = Arith_top
+Atom = qualid
+     | int | char | 'False' | 'True'
+     | '(' Exp ')'
+     | FunCall
+     | '[]'
+     | '(' Exp ',' Exp ')'
+FunCall = id '(' [ ActArgs ] ')'
+ActArgs = Exp ( ',' Exp )*
+int = [ '-' ] digit+
+id = alpha ( '_' | alphanumeric )*
+
+
+
+FORALL n in {1..top}: // MEMO: parse this by shunting yard.
+Arith_n = 
+        | Arith_{n-1} Opr_n Arith_n
+        | Arith_n Opl_n Arith_{n-1}
+        | Op1_n Arith_n
+        | Arith_{n-1}
+
+Opl_n = Opl WITH prio(Opl) == n
+Opr_n = Opr WITH prio(Opr) == n
+Op1_n = Op1 WITH prio(Op1) == n
+Opl = '+' | '-' | '*' | '%'
+    | '==' | '<' | '>' | '<=' | '>=' | '!='
+    | '&&' | '||'
+Opr = ':'
+Op1 = '!' | '-'
+
+Arith_0 = Atom
+
+/* ADJUSTMENTS */
+
+// Op2 = '+' | '-' | '*' | '%'
+       | '==' | '<' | '>' | '<=' | '>=' | '!='
+       | '&&' | '||'
+       | ':' // Replaced by Opl_n, Opr_n, and Op1_n
+// ActArgs = Exp [ ',' ActArgs ] // regularized
+// Exp = ... // Completely rewritten as Arith_n and Atom
+// qualid = id ('.' Selector)* // added, factored out of Stmt, Atom.
+// Field = [ Field ( '.' 'hd' | '.' 'tl' | '.' 'fst' | '.' 'snd' ) ] 
+    // left factored, regularized, factored out Selector, inlined.
+// Selector = 'hd' | 'tl' | 'fst' | 'snd' // Added
+// Compound = '{' Stmt* '}' // added, factored out of Stmt
+// FunType = [ FTypes ] '->' RetType // regularized and inlined
+// FTypes = Type [ FTypes ] // replaced by Type* in FunType
+// FArgs = (id ',') FArgs // removed left recursion, then regularized.
