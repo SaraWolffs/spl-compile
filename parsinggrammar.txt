@@ -1,0 +1,99 @@
+SPL = Decl+
+Decl = 
+    'var' VarInit
+  | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
+  | id FunOrNamedTypeVarDecl
+FunOrNamedTypeVarDecl = 
+   FunSig                     {peek in {'('}} 
+ | VarInit                    {peek in {id} }
+VarInit = id '=' Exp ';'
+FunSig = Tuplish_id [ '::' FunType ] '{' FStmt* '}'
+FStmt = 
+    'var' VarInit
+  | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
+  | KeyWordStmt               {peek in {'if','while','return'}}
+  | id StmtOrVarDecl
+StmtOrVarDecl = 
+   AssignOrCall               {peek in {'.','=','('}}
+ | VarInit                    {peek in {id} }
+RetType = Type | 'Void'
+FunType = Type* '->' RetType
+Type = NonIdType              {peek in {'Int','Bool','Char','(','['}}
+     | id 
+NonIdType = BType | Tuplish_Type | '[' Type ']'
+BType = 'Int' | 'Bool' | 'Char'
+Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
+ | 'while '(' Exp ')' Compound
+ | id AssignOrCall 
+ | 'return' [ Exp ] ';'
+AssignOrCall = 
+   Field '=' Exp ';'           {peek in {'.','='}}
+ | Tuplish_Exp ';'             {peek in {'('}}
+Compound = '{' Stmt* '}'
+Selector = 'hd' | 'tl' | 'fst' | 'snd'
+Field = ('.' Selector)*
+Exp = Arith_top
+Atom = id FieldOrCall
+ | int | char | 'False' | 'True'
+ | Tuplish_Exp                       {peek in {'('}}
+ | '[]'
+FieldOrCall = Field             {peek in <otherwise> }
+            | Tuplish_Exp ';'       {peek in {'('}}
+Tuplish_a = '(' [ a ( ',' a )* ] ')'
+
+
+
+FORALL n in {1..top}: // MEMO: parse this by shunting yard.
+Arith_n = 
+    | Arith_{n-1} Opr_n Arith_n
+    | Arith_n Opl_n Arith_{n-1}
+    | Op1_n Arith_n
+    | Arith_{n-1}
+Opl_n = Opl WITH prio(Opl) == n
+Opr_n = Opr WITH prio(Opr) == n
+Op1_n = Op1 WITH prio(Op1) == n
+Opl = '+' | '-' | '*' | '%'
+| '==' | '<' | '>' | '<=' | '>=' | '!='
+| '&&' | '||'
+Opr = ':'
+Op1 = '!' | '-'
+
+Arith_0 = Atom
+
+/***************   TOKENS    ****************/
+int = [ '-' ] digit+
+id = alpha ( '_' | alphanumeric )*
+keys:
+'var' 'Void' 'Int' 'Bool' 'Char' 'if' 'else' 'while' 'return' 'hd' 'tl' 'fst'
+'snd' 'False' 'True' 
+';' '(' ')' '{' '}' ']' ',' '.' 
+'&&' '||' '+' '%' 
+'<': '<='
+'>': '>='
+'!': '!='
+'=': '=='
+'[': '[]'
+':': '::'
+'-': '->' (int)
+'*': '*/'
+'//' '/*' // Special case: tokenize context-free
+
+/*************** ADJUSTMENTS ****************/
+
+// On top of the below (from grammar.txt), extensive left-factoring, and removal
+// of rules so made redundant.
+
+// Op2 = '+' | '-' | '*' | '%'
+   | '==' | '<' | '>' | '<=' | '>=' | '!='
+   | '&&' | '||'
+   | ':' // Replaced by Opl_n, Opr_n, and Op1_n
+// ActArgs = Exp [ ',' ActArgs ] // regularized
+// Exp = ... // Completely rewritten as Arith_n and Atom
+// qualid = id ('.' Selector)* // added, factored out of Stmt, Atom.
+// Field = [ Field ( '.' 'hd' | '.' 'tl' | '.' 'fst' | '.' 'snd' ) ] 
+// left factored, regularized, factored out Selector, inlined.
+// Selector = 'hd' | 'tl' | 'fst' | 'snd' // Added
+// Compound = '{' Stmt* '}' // added, factored out of Stmt
+// FunType = [ FTypes ] '->' RetType // regularized and inlined
+// FTypes = Type [ FTypes ] // replaced by Type* in FunType
+// FArgs = (id ',') FArgs // removed left recursion, then regularized.
