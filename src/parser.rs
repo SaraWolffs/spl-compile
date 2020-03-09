@@ -1,10 +1,10 @@
 
 mod lex {
     use std::collections::HashMap;
-    use std::str::CharIndices;
+    use std::str::{Chars,CharIndices};
     use crate::ast::{Id,Selector,BType,LitVal,Op,Loc,Located};
-    use core::iter::{Peekable};
-    use core::str::Chars;
+    use std::iter::{Peekable};
+    use std::num::ParseIntError;
     //use core::slice::{Iter};
 
     pub(super) enum Misc {
@@ -24,11 +24,7 @@ mod lex {
         Dot,
         Arrow,
         Assign,
-        LineComment,
-        CommentOpen,
-        CommentClose,
-        Whitespace,
-        TokFail(String),
+        TypeColon,
     }
 
     pub(super) enum Token {
@@ -45,7 +41,7 @@ mod lex {
         fn to_tok(self,l:Loc) -> Token;
     }
     
-    impl TokAble for String {
+    impl TokAble for u32 {
         fn to_tok(self,l:Loc) -> Token {
             Token::Id((self,l))
         }
@@ -90,7 +86,7 @@ mod lex {
         input : &'s str,
         loc : Loc,
         iter : Peekable<CharIndices<'s>>,
-        strtoks : HashMap<&'s str,Token>,
+        wordtoks : HashMap<&'s str,Token>,
         vars : Vec<&'s str>,
     }
 
@@ -109,13 +105,42 @@ mod lex {
             Some(self.iter.peek()?.1)
         }
 
-        /*
-        fn fail(&mut self, reason : &str) -> Option<Result<(usize,char),(String,Loc)>>{
-            unimplemented!()
+        fn step_ch(&mut self) -> Option<char> {
+            self.loc.len += 1;
+            Some(self.iter.next()?.1)
         }
-        */
 
+        fn escape_char(&mut self) -> Option<Result<char,&'static str>> {
+            Some(match self.step_ch()? {
+                '\n' => Ok('\n'),
+                '\\' => Ok('\\'),
+                '\n' => Err("\'\\ at end of line"),
+                _ => Err("Unrecognized escape sequence"),
+            })
+        }
 
+        fn parse_int(&mut self, start : usize) -> Result<i64,ParseIntError> {
+            let mut end = start;
+            loop {
+                match self.step() {
+                    Some((npos,c)) => {end = npos; if !c.is_digit(10) {break}}
+                    None => return self.input[start..].parse(),
+                }
+            }
+            self.input[start..=end].parse()
+        }
+
+        fn parse_word(&mut self, start : usize) -> Token {
+            0.to_tok(self.loc)
+        }
+
+        fn line_comment(&mut self) {
+            self.iter.skip_while(|(_,c)| { !(c == '\n') });
+            self.loc.next_line();
+        }
+
+        fn block_comment(&mut self) {
+        }
     }
 
     macro_rules! fail {
@@ -125,6 +150,7 @@ mod lex {
     impl Iterator for Lex<'_> {
         type Item = Result<Token,(String,Loc)>;
         fn next(&mut self) -> Option<Self::Item> {
+            self.loc.advance();
             let (pos,chr) = self.step()?;
             Some(Ok(match chr {
                 '+' => Plus.to_tok(self.loc),
@@ -137,6 +163,7 @@ mod lex {
                 ',' => Comma.to_tok(self.loc),
                 '.' => Dot.to_tok(self.loc),
                 '%' => Div.to_tok(self.loc),
+                '*' => Mul.to_tok(self.loc),
                 '[' => match self.ipeek() {
                     Some(']') => { self.step(); Nil.to_tok(self.loc) },
                     _ => BrackOpen.to_tok(self.loc),
@@ -157,6 +184,10 @@ mod lex {
                     Some('=') => { self.step(); Eq.to_tok(self.loc) },
                     _ => Assign.to_tok(self.loc),
                 },
+                ':' => match self.ipeek() {
+                    Some(':') => { self.step(); TypeColon.to_tok(self.loc) },
+                    _ => Cons.to_tok(self.loc),
+                },
                 '&' => match self.ipeek() {
                     Some('&') => { self.step(); And.to_tok(self.loc) },
                     _ => fail!("Found lone &",self.loc),
@@ -165,17 +196,39 @@ mod lex {
                     Some('|') => { self.step(); Or.to_tok(self.loc) },
                     _ => fail!("Found lone |",self.loc),
                 },
-                '\'' => match self.ipeek() {
+                '\'' => match self.step_ch() {
                     Some('\n') | None => fail!("\' at end of line",self.loc),
-                    Some('\\') => unimplemented!(),
+                    Some('\\') => match self.escape_char()? {
+                        Ok(x) => Char(x).to_tok(self.loc),
+                        Err(e) => fail!(e,self.loc),
+                    },
                     Some(x) => Char(x).to_tok(self.loc),
                 }
-                //               Some('\'') => match lin.
-                //                    Char(step_or(loc,lin,"\' at end of line")?).to_tok(self.loc),
-                x => fail!("Unrecognized character",self.loc),
+                '-' => match self.iter.peek().copied() {
+                    Some((_,'>')) => Arrow.to_tok(self.loc),
+                    Some((numpos,x)) => match x.is_digit(10) {
+                        true => Int(-self.parse_int(numpos).unwrap()).to_tok(self.loc),
+                        false => Minus.to_tok(self.loc),
+                    },
+                    _ => Minus.to_tok(self.loc),
+                }
+                '/' => match self.step_ch() {
+                    Some('/') => { self.line_comment(); return self.next() },
+                    Some('*') => { self.block_comment(); return self.next() },
+                    _ => fail!("Found lone /",self.loc),
+
+                }
+                '\n' => { self.loc.next_line(); return self.next() },
+                x => {
+                    if x.is_alphabetic() { self.parse_word(pos) }
+                    else if x.is_digit(10) { Int(self.parse_int(pos).unwrap()).to_tok(self.loc)}
+                    else if x.is_whitespace() { return self.next() }
+                    else { fail!("Unrecognized character",self.loc) }
+                },
             }))
         }
     }
+
 
     fn step<T>( loc: &mut Loc, iter: &mut dyn Iterator<Item = T>,
     ) -> Option<T> {

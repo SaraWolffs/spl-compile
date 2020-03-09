@@ -11,6 +11,7 @@ impl Loc {
     pub fn next_line(&mut self) {
         self.line += 1;
         self.col = 0;
+        self.len = 0;
     }
 
     pub fn advance(&mut self) {
@@ -67,7 +68,7 @@ pub(crate) enum Type {
 
 /** Terminal symbols/tokens **/
 
-pub(crate) type Id = Located<String>; //TODO: replace String with u32 tracking number?
+pub(crate) type Id = Located<u32>; //TODO: replace String with u32 tracking number?
 
 pub(crate) enum Selector {
     Hd, Tl, Fst, Snd
