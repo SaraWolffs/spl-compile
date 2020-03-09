@@ -1,5 +1,7 @@
 
 mod lex {
+    use std::collections::HashMap;
+    use std::str::CharIndices;
     use crate::ast::{Id,Selector,BType,LitVal,Op,Loc,Located};
     use core::iter::{Peekable};
     use core::str::Chars;
@@ -84,6 +86,97 @@ mod lex {
     }
     use Misc::*;
 
+    struct Lex<'s> {
+        input : &'s str,
+        loc : Loc,
+        iter : Peekable<CharIndices<'s>>,
+        strtoks : HashMap<&'s str,Token>,
+        vars : Vec<&'s str>,
+    }
+
+    impl Lex<'_>{
+        fn step(&mut self) -> Option<(usize,char)> {
+            self.loc.len += 1;
+            self.iter.next()
+        }
+
+        fn step_or(&mut self, errmsg: &str) -> Option<Result<(usize,char),(String,Loc)>>{
+            self.loc.len += 1;
+            Some(self.iter.next().ok_or((errmsg.to_string(),self.loc.to_owned())))
+        }
+
+        fn ipeek(&mut self) -> Option<char>{
+            Some(self.iter.peek()?.1)
+        }
+
+        /*
+        fn fail(&mut self, reason : &str) -> Option<Result<(usize,char),(String,Loc)>>{
+            unimplemented!()
+        }
+        */
+
+
+    }
+
+    macro_rules! fail {
+        ( $reason : expr, $loc : expr ) => {return Some(Err(($reason.to_string(),$loc)))};
+    }
+
+    impl Iterator for Lex<'_> {
+        type Item = Result<Token,(String,Loc)>;
+        fn next(&mut self) -> Option<Self::Item> {
+            let (pos,chr) = self.step()?;
+            Some(Ok(match chr {
+                '+' => Plus.to_tok(self.loc),
+                ';' => Semicolon.to_tok(self.loc),
+                '(' => ParenOpen.to_tok(self.loc),
+                ')' => ParenClose.to_tok(self.loc),
+                '{' => BraceOpen.to_tok(self.loc),
+                '}' => BraceClose.to_tok(self.loc),
+                ']' => BrackClose.to_tok(self.loc),
+                ',' => Comma.to_tok(self.loc),
+                '.' => Dot.to_tok(self.loc),
+                '%' => Div.to_tok(self.loc),
+                '[' => match self.ipeek() {
+                    Some(']') => { self.step(); Nil.to_tok(self.loc) },
+                    _ => BrackOpen.to_tok(self.loc),
+                },
+                '<' => match self.ipeek() {
+                    Some('=') => { self.step(); Leq.to_tok(self.loc) },
+                    _ => Lt.to_tok(self.loc),
+                },
+                '>' => match self.ipeek() {
+                    Some('=') => { self.step(); Geq.to_tok(self.loc) },
+                    _ => Gt.to_tok(self.loc),
+                },
+                '!' => match self.ipeek() {
+                    Some('=') => { self.step(); Neq.to_tok(self.loc) },
+                    _ => Not.to_tok(self.loc),
+                },
+                '=' => match self.ipeek() {
+                    Some('=') => { self.step(); Eq.to_tok(self.loc) },
+                    _ => Assign.to_tok(self.loc),
+                },
+                '&' => match self.ipeek() {
+                    Some('&') => { self.step(); And.to_tok(self.loc) },
+                    _ => fail!("Found lone &",self.loc),
+                },
+                '|' => match self.ipeek() {
+                    Some('|') => { self.step(); Or.to_tok(self.loc) },
+                    _ => fail!("Found lone |",self.loc),
+                },
+                '\'' => match self.ipeek() {
+                    Some('\n') | None => fail!("\' at end of line",self.loc),
+                    Some('\\') => unimplemented!(),
+                    Some(x) => Char(x).to_tok(self.loc),
+                }
+                //               Some('\'') => match lin.
+                //                    Char(step_or(loc,lin,"\' at end of line")?).to_tok(self.loc),
+                x => fail!("Unrecognized character",self.loc),
+            }))
+        }
+    }
+
     fn step<T>( loc: &mut Loc, iter: &mut dyn Iterator<Item = T>,
     ) -> Option<T> {
         loc.len += 1;
@@ -95,7 +188,7 @@ mod lex {
         loc.len += 1;
         iter.next().ok_or((errmsg.to_string(),loc.to_owned()))
     }
-    
+    /*
     pub(super) fn lex(input : &str) -> TokStream {
         use Token::*;
         let mut tokens : Vec<Token> = Vec::with_capacity(input.len()); // Absolute worst case
@@ -152,4 +245,5 @@ mod lex {
         }
         tokens
     }
+    */
 }
