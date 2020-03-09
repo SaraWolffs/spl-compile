@@ -16,12 +16,12 @@ FStmt =
 StmtOrVarDecl = 
    AssignOrCall               {peek in {'.','=','('}}
  | VarInit                    {peek in {id} }
-RetType = Type | 'Void'
+RetType = Type 
 FunType = Type* '->' RetType
 Type = NonIdType              {peek in {'Int','Bool','Char','(','['}}
      | id 
 NonIdType = BType | Tuplish_Type | '[' Type ']'
-BType = 'Int' | 'Bool' | 'Char'
+BType = 'Int' | 'Bool' | 'Char' | 'Void'
 Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
  | 'while '(' Exp ')' Compound
  | id AssignOrCall 
@@ -34,9 +34,8 @@ Selector = 'hd' | 'tl' | 'fst' | 'snd'
 Field = ('.' Selector)*
 Exp = Arith_top
 Atom = id FieldOrCall
- | int | char | 'False' | 'True'
+ | int | char | 'False' | 'True' | '[]'
  | Tuplish_Exp                       {peek in {'('}}
- | '[]'
 FieldOrCall = Field             {peek in <otherwise> }
             | Tuplish_Exp ';'       {peek in {'('}}
 Tuplish_a = '(' [ a ( ',' a )* ] ')'
@@ -63,6 +62,7 @@ Arith_0 = Atom
 /***************   TOKENS    ****************/
 int = [ '-' ] digit+
 id = alpha ( '_' | alphanumeric )*
+char = "'" any
 keys:
 'var' 'Void' 'Int' 'Bool' 'Char' 'if' 'else' 'while' 'return' 'hd' 'tl' 'fst'
 'snd' 'False' 'True' 
@@ -76,7 +76,8 @@ keys:
 ':': '::'
 '-': '->' (int)
 '*': '*/'
-'//' '/*' // Special case: tokenize context-free
+'//' '/*' // Special case: strip in preprocessing
+
 
 /*************** ADJUSTMENTS ****************/
 
