@@ -70,10 +70,12 @@ pub(crate) enum Type {
 
 pub(crate) type Id = Located<u32>; //TODO: replace String with u32 tracking number?
 
+#[derive(Copy,Clone)]
 pub(crate) enum Selector {
     Hd, Tl, Fst, Snd
 }
 
+#[derive(Copy,Clone)]
 pub(crate) enum BType {
     IntT,
     BoolT,
@@ -81,6 +83,7 @@ pub(crate) enum BType {
     UnitT,
 }
 
+#[derive(Copy,Clone)]
 pub(crate) enum LitVal {
     Int(i64),
     Char(char),
@@ -88,6 +91,7 @@ pub(crate) enum LitVal {
     Nil,
 }
 
+#[derive(Copy,Clone)]
 pub(crate) enum Op {
     And, Or, Not,
     Lt, Leq, Gt, Geq, Eq, Neq, 

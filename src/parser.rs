@@ -7,6 +7,7 @@ mod lex {
     use std::num::ParseIntError;
     //use core::slice::{Iter};
 
+    #[derive(Copy,Clone)]
     pub(super) enum Misc {
         Var,
         If,
@@ -27,6 +28,7 @@ mod lex {
         TypeColon,
     }
 
+    #[derive(Copy,Clone)]
     pub(super) enum Token {
         Id(Id),
         Selector(Located<Selector>),
@@ -82,32 +84,84 @@ mod lex {
     }
     use Misc::*;
 
+    #[derive(Copy,Clone)]
+    enum PreToken {
+        PreId(u32),
+        PreSel(Selector),
+        PreLit(LitVal),
+        PreTyp(BType),
+        PreMisc(Misc),
+    }
+    use PreToken::*;
+
+    impl TokAble for PreToken {
+        fn to_tok(self,l:Loc) -> Token {
+            match self {
+                PreId(x) => x.to_tok(l),
+                PreSel(x) => x.to_tok(l),
+                PreLit(x) => x.to_tok(l),
+                PreTyp(x) => x.to_tok(l),
+                PreMisc(x) => x.to_tok(l),
+            }
+        }
+    }
+
     struct Lex<'s> {
         input : &'s str,
         loc : Loc,
-        iter : Peekable<CharIndices<'s>>,
-        wordtoks : HashMap<&'s str,Token>,
-        vars : Vec<&'s str>,
+        chars : Peekable<CharIndices<'s>>,
+        wordtoks : HashMap<&'s str,PreToken>,
+        names : Vec<&'s str>,
+        vcount : u32,
     }
 
     impl Lex<'_>{
+        pub(super) fn lex<'s>(source: &'s str) -> Lex<'s>{
+            let mut keywords = HashMap::with_capacity(256);
+            keywords.insert("var",PreMisc(Var));
+            keywords.insert("Void",PreTyp(UnitT));
+            keywords.insert("Int",PreTyp(IntT));
+            keywords.insert("Bool",PreTyp(BoolT));
+            keywords.insert("Char",PreTyp(CharT));
+            keywords.insert("if",PreMisc(If));
+            keywords.insert("else",PreMisc(Else));
+            keywords.insert("while",PreMisc(While));
+            keywords.insert("return",PreMisc(Return));
+            keywords.insert("hd",PreSel(Hd));
+            keywords.insert("tl",PreSel(Tl));
+            keywords.insert("fst",PreSel(Fst));
+            keywords.insert("snd",PreSel(Snd));
+            keywords.insert("False",PreLit(Bool(false)));
+            keywords.insert("True",PreLit(Bool(true)));
+
+
+            Lex{ input : source, 
+                 loc : Loc { line : 0, col : 0, len : 0 },
+                 chars : source.char_indices().peekable(),
+                 wordtoks : keywords,
+                 names : Vec::with_capacity(128),
+                 vcount : 0,
+            }
+
+        }
+
         fn step(&mut self) -> Option<(usize,char)> {
             self.loc.len += 1;
-            self.iter.next()
+            self.chars.next()
         }
 
         fn step_or(&mut self, errmsg: &str) -> Option<Result<(usize,char),(String,Loc)>>{
             self.loc.len += 1;
-            Some(self.iter.next().ok_or((errmsg.to_string(),self.loc.to_owned())))
+            Some(self.chars.next().ok_or((errmsg.to_string(),self.loc.to_owned())))
         }
 
         fn ipeek(&mut self) -> Option<char>{
-            Some(self.iter.peek()?.1)
+            Some(self.chars.peek()?.1)
         }
 
         fn step_ch(&mut self) -> Option<char> {
             self.loc.len += 1;
-            Some(self.iter.next()?.1)
+            Some(self.chars.next()?.1)
         }
 
         fn escape_char(&mut self) -> Option<Result<char,&'static str>> {
@@ -120,26 +174,65 @@ mod lex {
         }
 
         fn parse_int(&mut self, start : usize) -> Result<i64,ParseIntError> {
-            let mut end = start;
             loop {
                 match self.step() {
-                    Some((npos,c)) => {end = npos; if !c.is_digit(10) {break}}
+                    Some((end,c)) => if !c.is_digit(10) {
+                        return self.input[start..end].parse()},
                     None => return self.input[start..].parse(),
                 }
             }
-            self.input[start..=end].parse()
         }
 
-        fn parse_word(&mut self, start : usize) -> Token {
-            0.to_tok(self.loc)
+        fn parse_word(&mut self, start : usize) -> PreToken {
+            let word : &str = loop {
+                match self.step() {
+                    Some((end,c)) => if !c.is_alphanumeric() {
+                        break &self.input[start..end]},
+                    None => break &self.input[start..],
+                }
+            };
+            *self.wordtoks.entry(word).or_insert({
+                    self.names.push(word);
+                    self.vcount += 1;
+                    PreId(self.vcount-1)
+            })
         }
 
         fn line_comment(&mut self) {
-            self.iter.skip_while(|(_,c)| { !(c == '\n') });
+            for (_,c) in &mut self.chars {
+                    if c == '\n' {break};
+            };
+            /*
+            loop {
+                match self.chars.next() {
+                    Some((_,c)) => if c == '\n' {break},
+                    None => break,
+                }
+            }
+            */
             self.loc.next_line();
         }
 
-        fn block_comment(&mut self) {
+        fn rec_block_comment(&mut self) -> Option<()> {
+            loop{
+                match self.step_ch()? {
+                    '*' => match self.ipeek() {
+                        Some('/') => { self.step(); break Some(()); },
+                        _ => ()
+                    },
+                    '/' => match self.ipeek() {
+                        Some('*') => { self.step(); self.rec_block_comment()?; () },
+                        _ => (),
+                    },
+                    '\n' => self.loc.next_line(),
+                    _ => (),
+                }
+            }
+        }
+
+        fn block_comment(&mut self) -> Result<(),Loc> {
+            let startloc = self.loc;
+            self.rec_block_comment().ok_or(startloc)
         }
     }
 
@@ -204,7 +297,7 @@ mod lex {
                     },
                     Some(x) => Char(x).to_tok(self.loc),
                 }
-                '-' => match self.iter.peek().copied() {
+                '-' => match self.chars.peek().copied() {
                     Some((_,'>')) => Arrow.to_tok(self.loc),
                     Some((numpos,x)) => match x.is_digit(10) {
                         true => Int(-self.parse_int(numpos).unwrap()).to_tok(self.loc),
@@ -214,13 +307,16 @@ mod lex {
                 }
                 '/' => match self.step_ch() {
                     Some('/') => { self.line_comment(); return self.next() },
-                    Some('*') => { self.block_comment(); return self.next() },
+                    Some('*') => match self.block_comment() {
+                        Err(l) => fail!("Unclosed block comment started",l),
+                        Ok(()) => return self.next(),
+                    },
                     _ => fail!("Found lone /",self.loc),
 
                 }
                 '\n' => { self.loc.next_line(); return self.next() },
                 x => {
-                    if x.is_alphabetic() { self.parse_word(pos) }
+                    if x.is_alphabetic() { self.parse_word(pos).to_tok(self.loc) }
                     else if x.is_digit(10) { Int(self.parse_int(pos).unwrap()).to_tok(self.loc)}
                     else if x.is_whitespace() { return self.next() }
                     else { fail!("Unrecognized character",self.loc) }
@@ -230,16 +326,16 @@ mod lex {
     }
 
 
-    fn step<T>( loc: &mut Loc, iter: &mut dyn Iterator<Item = T>,
+    fn step<T>( loc: &mut Loc, iterable: &mut dyn Iterator<Item = T>,
     ) -> Option<T> {
         loc.len += 1;
-        iter.next()
+        iterable.next()
     }
 
-    fn step_or<T>(loc: &mut Loc, iter: &mut dyn Iterator<Item = T>, errmsg: &str,
+    fn step_or<T>(loc: &mut Loc, iterable: &mut dyn Iterator<Item = T>, errmsg: &str,
     ) -> Result<T,(String,Loc)> {
         loc.len += 1;
-        iter.next().ok_or((errmsg.to_string(),loc.to_owned()))
+        iterable.next().ok_or((errmsg.to_string(),loc.to_owned()))
     }
     /*
     pub(super) fn lex(input : &str) -> TokStream {
