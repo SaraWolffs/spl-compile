@@ -30,60 +30,67 @@ mod lex {
 
     #[derive(Copy,Clone)]
     pub(super) enum Token {
-        Id(Id),
-        Selector(Located<Selector>),
-        Type(Located<BType>),
-        Lit(Located<LitVal>),
-        Op(Located<Op>),
-        Marker(Located<Misc>),
+        Id(u32),
+        Selector(Selector),
+        Type(BType),
+        Lit(LitVal),
+        Op(Op),
+        Marker(Misc),
     }
     pub(super) type TokStream = Vec<Token>;
+    pub(super) type LocTok = Located<Token>;
 
     trait TokAble  {
-        fn to_tok(self,l:Loc) -> Token;
+        fn to_tok(self) -> Token;
+        fn to_ltok(self,l:Loc) -> LocTok 
+            where Self: std::marker::Sized {
+            (self.to_tok(),l)
+        }
+
     }
     
     impl TokAble for u32 {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Id((self,l))
+        fn to_tok(self) -> Token {
+            Token::Id(self)
         }
     }
     
     impl TokAble for Selector {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Selector((self,l))
+        fn to_tok(self) -> Token {
+            Token::Selector(self)
         }
     }
     use crate::ast::Selector::*;
 
     impl TokAble for BType {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Type((self,l))
+        fn to_tok(self) -> Token {
+            Token::Type(self)
         }
     }
     use crate::ast::BType::*;
 
     impl TokAble for LitVal {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Lit((self,l))
+        fn to_tok(self) -> Token {
+            Token::Lit(self)
         }
     }
     use crate::ast::LitVal::*;
 
     impl TokAble for Op {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Op((self,l))
+        fn to_tok(self) -> Token {
+            Token::Op(self)
         }
     }
     use crate::ast::Op::*;
     
     impl TokAble for Misc {
-        fn to_tok(self,l:Loc) -> Token {
-            Token::Marker((self,l))
+        fn to_tok(self) -> Token {
+            Token::Marker(self)
         }
     }
     use Misc::*;
 
+    /*
     #[derive(Copy,Clone)]
     enum PreToken {
         PreId(u32),
@@ -95,7 +102,7 @@ mod lex {
     use PreToken::*;
 
     impl TokAble for PreToken {
-        fn to_tok(self,l:Loc) -> Token {
+        fn to_tok(self) -> Token {
             match self {
                 PreId(x) => x.to_tok(l),
                 PreSel(x) => x.to_tok(l),
@@ -105,34 +112,36 @@ mod lex {
             }
         }
     }
+    */
 
     struct Lex<'s> {
         input : &'s str,
         loc : Loc,
         chars : Peekable<CharIndices<'s>>,
-        wordtoks : HashMap<&'s str,PreToken>,
+        wordtoks : HashMap<&'s str,Token>,
         names : Vec<&'s str>,
         vcount : u32,
     }
 
     impl Lex<'_>{
         pub(super) fn lex<'s>(source: &'s str) -> Lex<'s>{
+            use crate::parser::lex::Token::*;
             let mut keywords = HashMap::with_capacity(256);
-            keywords.insert("var",PreMisc(Var));
-            keywords.insert("Void",PreTyp(UnitT));
-            keywords.insert("Int",PreTyp(IntT));
-            keywords.insert("Bool",PreTyp(BoolT));
-            keywords.insert("Char",PreTyp(CharT));
-            keywords.insert("if",PreMisc(If));
-            keywords.insert("else",PreMisc(Else));
-            keywords.insert("while",PreMisc(While));
-            keywords.insert("return",PreMisc(Return));
-            keywords.insert("hd",PreSel(Hd));
-            keywords.insert("tl",PreSel(Tl));
-            keywords.insert("fst",PreSel(Fst));
-            keywords.insert("snd",PreSel(Snd));
-            keywords.insert("False",PreLit(Bool(false)));
-            keywords.insert("True",PreLit(Bool(true)));
+            keywords.insert("var",Marker(Var));
+            keywords.insert("Void",Type(UnitT));
+            keywords.insert("Int",Type(IntT));
+            keywords.insert("Bool",Type(BoolT));
+            keywords.insert("Char",Type(CharT));
+            keywords.insert("if",Marker(If));
+            keywords.insert("else",Marker(Else));
+            keywords.insert("while",Marker(While));
+            keywords.insert("return",Marker(Return));
+            keywords.insert("hd",Selector(Hd));
+            keywords.insert("tl",Selector(Tl));
+            keywords.insert("fst",Selector(Fst));
+            keywords.insert("snd",Selector(Snd));
+            keywords.insert("False",Lit(Bool(false)));
+            keywords.insert("True",Lit(Bool(true)));
 
 
             Lex{ input : source, 
@@ -166,7 +175,7 @@ mod lex {
 
         fn escape_char(&mut self) -> Option<Result<char,&'static str>> {
             Some(match self.step_ch()? {
-                '\n' => Ok('\n'),
+                'n' => Ok('\n'),
                 '\\' => Ok('\\'),
                 '\n' => Err("\'\\ at end of line"),
                 _ => Err("Unrecognized escape sequence"),
@@ -183,7 +192,7 @@ mod lex {
             }
         }
 
-        fn parse_word(&mut self, start : usize) -> PreToken {
+        fn parse_word(&mut self, start : usize) -> Token {
             let word : &str = loop {
                 match self.step() {
                     Some((end,c)) => if !c.is_alphanumeric() {
@@ -194,7 +203,7 @@ mod lex {
             *self.wordtoks.entry(word).or_insert({
                     self.names.push(word);
                     self.vcount += 1;
-                    PreId(self.vcount-1)
+                    crate::parser::lex::Token::Id(self.vcount-1)
             })
         }
 
@@ -241,69 +250,69 @@ mod lex {
     }
 
     impl Iterator for Lex<'_> {
-        type Item = Result<Token,(String,Loc)>;
+        type Item = Result<LocTok,(String,Loc)>;
         fn next(&mut self) -> Option<Self::Item> {
             self.loc.advance();
             let (pos,chr) = self.step()?;
             Some(Ok(match chr {
-                '+' => Plus.to_tok(self.loc),
-                ';' => Semicolon.to_tok(self.loc),
-                '(' => ParenOpen.to_tok(self.loc),
-                ')' => ParenClose.to_tok(self.loc),
-                '{' => BraceOpen.to_tok(self.loc),
-                '}' => BraceClose.to_tok(self.loc),
-                ']' => BrackClose.to_tok(self.loc),
-                ',' => Comma.to_tok(self.loc),
-                '.' => Dot.to_tok(self.loc),
-                '%' => Div.to_tok(self.loc),
-                '*' => Mul.to_tok(self.loc),
+                '+' => Plus.to_ltok(self.loc),
+                ';' => Semicolon.to_ltok(self.loc),
+                '(' => ParenOpen.to_ltok(self.loc),
+                ')' => ParenClose.to_ltok(self.loc),
+                '{' => BraceOpen.to_ltok(self.loc),
+                '}' => BraceClose.to_ltok(self.loc),
+                ']' => BrackClose.to_ltok(self.loc),
+                ',' => Comma.to_ltok(self.loc),
+                '.' => Dot.to_ltok(self.loc),
+                '%' => Div.to_ltok(self.loc),
+                '*' => Mul.to_ltok(self.loc),
                 '[' => match self.ipeek() {
-                    Some(']') => { self.step(); Nil.to_tok(self.loc) },
-                    _ => BrackOpen.to_tok(self.loc),
+                    Some(']') => { self.step(); Nil.to_ltok(self.loc) },
+                    _ => BrackOpen.to_ltok(self.loc),
                 },
                 '<' => match self.ipeek() {
-                    Some('=') => { self.step(); Leq.to_tok(self.loc) },
-                    _ => Lt.to_tok(self.loc),
+                    Some('=') => { self.step(); Leq.to_ltok(self.loc) },
+                    _ => Lt.to_ltok(self.loc),
                 },
                 '>' => match self.ipeek() {
-                    Some('=') => { self.step(); Geq.to_tok(self.loc) },
-                    _ => Gt.to_tok(self.loc),
+                    Some('=') => { self.step(); Geq.to_ltok(self.loc) },
+                    _ => Gt.to_ltok(self.loc),
                 },
                 '!' => match self.ipeek() {
-                    Some('=') => { self.step(); Neq.to_tok(self.loc) },
-                    _ => Not.to_tok(self.loc),
+                    Some('=') => { self.step(); Neq.to_ltok(self.loc) },
+                    _ => Not.to_ltok(self.loc),
                 },
                 '=' => match self.ipeek() {
-                    Some('=') => { self.step(); Eq.to_tok(self.loc) },
-                    _ => Assign.to_tok(self.loc),
+                    Some('=') => { self.step(); Eq.to_ltok(self.loc) },
+                    _ => Assign.to_ltok(self.loc),
                 },
                 ':' => match self.ipeek() {
-                    Some(':') => { self.step(); TypeColon.to_tok(self.loc) },
-                    _ => Cons.to_tok(self.loc),
+                    Some(':') => { self.step(); TypeColon.to_ltok(self.loc) },
+                    _ => Cons.to_ltok(self.loc),
                 },
                 '&' => match self.ipeek() {
-                    Some('&') => { self.step(); And.to_tok(self.loc) },
+                    Some('&') => { self.step(); And.to_ltok(self.loc) },
                     _ => fail!("Found lone &",self.loc),
                 },
                 '|' => match self.ipeek() {
-                    Some('|') => { self.step(); Or.to_tok(self.loc) },
+                    Some('|') => { self.step(); Or.to_ltok(self.loc) },
                     _ => fail!("Found lone |",self.loc),
                 },
                 '\'' => match self.step_ch() {
                     Some('\n') | None => fail!("\' at end of line",self.loc),
                     Some('\\') => match self.escape_char()? {
-                        Ok(x) => Char(x).to_tok(self.loc),
+                        Ok(x) => Char(x).to_ltok(self.loc),
                         Err(e) => fail!(e,self.loc),
                     },
-                    Some(x) => Char(x).to_tok(self.loc),
+                    Some(x) => Char(x).to_ltok(self.loc),
                 }
                 '-' => match self.chars.peek().copied() {
-                    Some((_,'>')) => Arrow.to_tok(self.loc),
+                    Some((_,'>')) => Arrow.to_ltok(self.loc),
                     Some((numpos,x)) => match x.is_digit(10) {
-                        true => Int(-self.parse_int(numpos).unwrap()).to_tok(self.loc),
-                        false => Minus.to_tok(self.loc),
+                        true => Int(-self.parse_int(numpos).unwrap()).to_ltok(self.loc),
+                        false => Minus.to_ltok(self.loc),
                     },
-                    _ => Minus.to_tok(self.loc),
+                    _ => Minus.to_ltok(self.loc),
                 }
                 '/' => match self.step_ch() {
                     Some('/') => { self.line_comment(); return self.next() },
@@ -316,8 +325,8 @@ mod lex {
                 }
                 '\n' => { self.loc.next_line(); return self.next() },
                 x => {
-                    if x.is_alphabetic() { self.parse_word(pos).to_tok(self.loc) }
-                    else if x.is_digit(10) { Int(self.parse_int(pos).unwrap()).to_tok(self.loc)}
+                    if x.is_alphabetic() { (self.parse_word(pos),self.loc) }
+                    else if x.is_digit(10) { Int(self.parse_int(pos).unwrap()).to_ltok(self.loc)}
                     else if x.is_whitespace() { return self.next() }
                     else { fail!("Unrecognized character",self.loc) }
                 },
@@ -347,48 +356,48 @@ mod lex {
         let iter = &mut iterlife;
         loop {
             let tok = match step(loc,lin) {
-                Some('+') => Plus.to_tok(*loc),
-                Some(';') => Semicolon.to_tok(*loc),
-                Some('(') => ParenOpen.to_tok(*loc),
-                Some(')') => ParenClose.to_tok(*loc),
-                Some('{') => BraceOpen.to_tok(*loc),
-                Some('}') => BraceClose.to_tok(*loc),
-                Some(']') => BrackClose.to_tok(*loc),
-                Some(',') => Comma.to_tok(*loc),
-                Some('.') => Dot.to_tok(*loc),
-                Some('%') => Div.to_tok(*loc),
+                Some('+') => Plus.to_ltok(*loc),
+                Some(';') => Semicolon.to_ltok(*loc),
+                Some('(') => ParenOpen.to_ltok(*loc),
+                Some(')') => ParenClose.to_ltok(*loc),
+                Some('{') => BraceOpen.to_ltok(*loc),
+                Some('}') => BraceClose.to_ltok(*loc),
+                Some(']') => BrackClose.to_ltok(*loc),
+                Some(',') => Comma.to_ltok(*loc),
+                Some('.') => Dot.to_ltok(*loc),
+                Some('%') => Div.to_ltok(*loc),
                 Some('[') => match lin.peek() {
-                    Some(']') => { step(loc,lin); Nil.to_tok(*loc) },
-                    _ => BrackOpen.to_tok(*loc),
+                    Some(']') => { step(loc,lin); Nil.to_ltok(*loc) },
+                    _ => BrackOpen.to_ltok(*loc),
                 },
                 Some('<') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Leq.to_tok(*loc) },
-                    _ => Lt.to_tok(*loc),
+                    Some('=') => { step(loc,lin); Leq.to_ltok(*loc) },
+                    _ => Lt.to_ltok(*loc),
                 },
                 Some('>') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Geq.to_tok(*loc) },
-                    _ => Gt.to_tok(*loc),
+                    Some('=') => { step(loc,lin); Geq.to_ltok(*loc) },
+                    _ => Gt.to_ltok(*loc),
                 },
                 Some('!') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Neq.to_tok(*loc) },
-                    _ => Not.to_tok(*loc),
+                    Some('=') => { step(loc,lin); Neq.to_ltok(*loc) },
+                    _ => Not.to_ltok(*loc),
                 },
                 Some('=') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Eq.to_tok(*loc) },
-                    _ => Assign.to_tok(*loc),
+                    Some('=') => { step(loc,lin); Eq.to_ltok(*loc) },
+                    _ => Assign.to_ltok(*loc),
                 },
                 Some('&') => match lin.peek() {
-                    Some('&') => { step(loc,lin); And.to_tok(*loc) },
-                    _ => TokFail("Found lone &".to_string()).to_tok(*loc),
+                    Some('&') => { step(loc,lin); And.to_ltok(*loc) },
+                    _ => TokFail("Found lone &".to_string()).to_ltok(*loc),
                 },
                 Some('|') => match lin.peek() {
-                    Some('|') => { step(loc,lin); Or.to_tok(*loc) },
-                    _ => TokFail("Found lone |".to_string()).to_tok(*loc),
+                    Some('|') => { step(loc,lin); Or.to_ltok(*loc) },
+                    _ => TokFail("Found lone |".to_string()).to_ltok(*loc),
                 },
                 //               Some('\'') => match lin.
-                //                    Char(step_or(loc,lin,"\' at end of line")?).to_tok(*loc),
+                //                    Char(step_or(loc,lin,"\' at end of line")?).to_ltok(*loc),
                 None => break,
-                x => TokFail("Unrecognized character".to_string()).to_tok(*loc),
+                x => TokFail("Unrecognized character".to_string()).to_ltok(*loc),
             };
             loc.advance();
         }
