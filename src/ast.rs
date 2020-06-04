@@ -1,7 +1,5 @@
-use std::ops::Deref;
-
-#[derive(Copy,Clone)]
-pub(crate) struct Loc{
+#[derive(Copy,Clone,Debug)]
+pub struct Loc{
     pub line: u32,
     pub col: u16,
     pub len: u16,
@@ -20,26 +18,16 @@ impl Loc {
     }
 }
 
-pub(crate) type Located<T> = (T,Loc);
+pub type Located<T> = (T,Loc);
 
-/*
-impl<T> Deref for Located<T> {
-    type Target = T;
+pub type SPL = Vec<Decl>;
 
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-*/
-
-pub(crate) type SPL = Vec<Decl>;
-
-pub(crate) enum Decl {
-    Var(Option<Id>,Id,Exp),
+pub enum Decl {
+    Var(Option<Type>,Id,Exp),
     Fun(Id,Vec<Id>,Option<FunType>,Vec<Decl>,Vec<Stmt>)
 }
 
-pub(crate) enum Exp {
+pub enum Exp {
     Var(Id,Vec<Selector>),
     Call(Id,Vec<Exp>),
     Lit(LitVal),
@@ -48,7 +36,7 @@ pub(crate) enum Exp {
     UnOp(Op,Box<Exp>)
 }
 
-pub(crate) enum Stmt {
+pub enum Stmt {
     ITE(Exp,Vec<Stmt>,Vec<Stmt>),
     While(Exp,Vec<Stmt>),
     Assign(Id,Exp),
@@ -56,9 +44,9 @@ pub(crate) enum Stmt {
     Ret(Option<Exp>)
 }
 
-pub(crate) type FunType = (Vec<Type>,Type);
+pub type FunType = (Vec<Type>,Type);
 
-pub(crate) enum Type {
+pub enum Type {
     Lit(BType),
     Typename(Id),
     Tuple(Vec<Type>),
@@ -68,31 +56,31 @@ pub(crate) enum Type {
 
 /** Terminal symbols/tokens **/
 
-pub(crate) type Id = Located<u32>; //TODO: replace String with u32 tracking number?
+pub type Id = Located<u32>; 
 
-#[derive(Copy,Clone)]
-pub(crate) enum Selector {
+#[derive(Copy,Clone,Debug)]
+pub enum Selector {
     Hd, Tl, Fst, Snd
 }
 
-#[derive(Copy,Clone)]
-pub(crate) enum BType {
+#[derive(Copy,Clone,Debug)]
+pub enum BType {
     IntT,
     BoolT,
     CharT,
     UnitT,
 }
 
-#[derive(Copy,Clone)]
-pub(crate) enum LitVal {
+#[derive(Copy,Clone,Debug)]
+pub enum LitVal {
     Int(i64),
     Char(char),
     Bool(bool),
     Nil,
 }
 
-#[derive(Copy,Clone)]
-pub(crate) enum Op {
+#[derive(Copy,Clone,Debug)]
+pub enum Op {
     And, Or, Not,
     Lt, Leq, Gt, Geq, Eq, Neq, 
     Plus, Minus, Mul, Div,

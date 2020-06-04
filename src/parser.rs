@@ -1,13 +1,13 @@
 
 mod lex {
     use std::collections::HashMap;
-    use std::str::{Chars,CharIndices};
-    use crate::ast::{Id,Selector,BType,LitVal,Op,Loc,Located};
+    use std::str::{CharIndices};
+    use crate::ast::{Selector,BType,LitVal,Op,Loc,Located};
     use std::iter::{Peekable};
     use std::num::ParseIntError;
     //use core::slice::{Iter};
 
-    #[derive(Copy,Clone)]
+    #[derive(Copy,Clone,Debug)]
     pub(super) enum Misc {
         Var,
         If,
@@ -28,16 +28,16 @@ mod lex {
         TypeColon,
     }
 
-    #[derive(Copy,Clone)]
+    #[derive(Copy,Clone,Debug)]
     pub(super) enum Token {
-        Id(u32),
+        IdTok(u32),
         Selector(Selector),
-        Type(BType),
+        TypeTok(BType),
         Lit(LitVal),
         Op(Op),
         Marker(Misc),
     }
-    pub(super) type TokStream = Vec<Token>;
+
     pub(super) type LocTok = Located<Token>;
 
     trait TokAble  {
@@ -51,7 +51,7 @@ mod lex {
     
     impl TokAble for u32 {
         fn to_tok(self) -> Token {
-            Token::Id(self)
+            Token::IdTok(self)
         }
     }
     
@@ -64,7 +64,7 @@ mod lex {
 
     impl TokAble for BType {
         fn to_tok(self) -> Token {
-            Token::Type(self)
+            Token::TypeTok(self)
         }
     }
     use crate::ast::BType::*;
@@ -90,31 +90,7 @@ mod lex {
     }
     use Misc::*;
 
-    /*
-    #[derive(Copy,Clone)]
-    enum PreToken {
-        PreId(u32),
-        PreSel(Selector),
-        PreLit(LitVal),
-        PreTyp(BType),
-        PreMisc(Misc),
-    }
-    use PreToken::*;
-
-    impl TokAble for PreToken {
-        fn to_tok(self) -> Token {
-            match self {
-                PreId(x) => x.to_tok(l),
-                PreSel(x) => x.to_tok(l),
-                PreLit(x) => x.to_tok(l),
-                PreTyp(x) => x.to_tok(l),
-                PreMisc(x) => x.to_tok(l),
-            }
-        }
-    }
-    */
-
-    struct Lex<'s> {
+    pub(super) struct Lex<'s> {
         input : &'s str,
         loc : Loc,
         chars : Peekable<CharIndices<'s>>,
@@ -124,14 +100,14 @@ mod lex {
     }
 
     impl Lex<'_>{
-        pub(super) fn lex<'s>(source: &'s str) -> Lex<'s>{
+        pub fn lex<'s>(source: &'s str) -> Lex<'s>{
             use crate::parser::lex::Token::*;
             let mut keywords = HashMap::with_capacity(256);
             keywords.insert("var",Marker(Var));
-            keywords.insert("Void",Type(UnitT));
-            keywords.insert("Int",Type(IntT));
-            keywords.insert("Bool",Type(BoolT));
-            keywords.insert("Char",Type(CharT));
+            keywords.insert("Void",TypeTok(UnitT));
+            keywords.insert("Int",TypeTok(IntT));
+            keywords.insert("Bool",TypeTok(BoolT));
+            keywords.insert("Char",TypeTok(CharT));
             keywords.insert("if",Marker(If));
             keywords.insert("else",Marker(Else));
             keywords.insert("while",Marker(While));
@@ -157,11 +133,6 @@ mod lex {
         fn step(&mut self) -> Option<(usize,char)> {
             self.loc.len += 1;
             self.chars.next()
-        }
-
-        fn step_or(&mut self, errmsg: &str) -> Option<Result<(usize,char),(String,Loc)>>{
-            self.loc.len += 1;
-            Some(self.chars.next().ok_or((errmsg.to_string(),self.loc.to_owned())))
         }
 
         fn ipeek(&mut self) -> Option<char>{
@@ -203,7 +174,7 @@ mod lex {
             *self.wordtoks.entry(word).or_insert({
                     self.names.push(word);
                     self.vcount += 1;
-                    crate::parser::lex::Token::Id(self.vcount-1)
+                    crate::parser::lex::Token::IdTok(self.vcount-1)
             })
         }
 
@@ -211,14 +182,6 @@ mod lex {
             for (_,c) in &mut self.chars {
                     if c == '\n' {break};
             };
-            /*
-            loop {
-                match self.chars.next() {
-                    Some((_,c)) => if c == '\n' {break},
-                    None => break,
-                }
-            }
-            */
             self.loc.next_line();
         }
 
@@ -333,75 +296,77 @@ mod lex {
             }))
         }
     }
+    #[path = "tests/lex.rs"] mod tests;
+}
+
+use crate::ast::*;
+use lex::Token::*;
+use lex::Misc::*;
+type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
+
+macro_rules! unexpected {
+    ( $found: expr, $loc : expr, $expected: expr ) => 
+    {return Err((format!("Unexpected {:?} encountered while looking for {}",
+            $found, $expected),Some($loc)))};
+}
+
+macro_rules! fail {
+    ( $reason : expr, $loc : expr ) => {return Err(($reason.to_string(),Some($loc)))};
+    ( $reason : expr ) => {return Err(($reason.to_string(),None))};
+}
+
+type ParseError = (String,Option<crate::ast::Loc>);
+
+type ParseResult<T> = Result<T,ParseError>;
 
 
-    fn step<T>( loc: &mut Loc, iterable: &mut dyn Iterator<Item = T>,
-    ) -> Option<T> {
-        loc.len += 1;
-        iterable.next()
-    }
-
-    fn step_or<T>(loc: &mut Loc, iterable: &mut dyn Iterator<Item = T>, errmsg: &str,
-    ) -> Result<T,(String,Loc)> {
-        loc.len += 1;
-        iterable.next().ok_or((errmsg.to_string(),loc.to_owned()))
-    }
-    /*
-    pub(super) fn lex(input : &str) -> TokStream {
-        use Token::*;
-        let mut tokens : Vec<Token> = Vec::with_capacity(input.len()); // Absolute worst case
-        let mut loclife = Loc{ line: 0, col: 0, len: 0 };
-        let loc = &mut loclife;
-        let mut iterlife = input.char_indices().peekable();
-        let iter = &mut iterlife;
-        loop {
-            let tok = match step(loc,lin) {
-                Some('+') => Plus.to_ltok(*loc),
-                Some(';') => Semicolon.to_ltok(*loc),
-                Some('(') => ParenOpen.to_ltok(*loc),
-                Some(')') => ParenClose.to_ltok(*loc),
-                Some('{') => BraceOpen.to_ltok(*loc),
-                Some('}') => BraceClose.to_ltok(*loc),
-                Some(']') => BrackClose.to_ltok(*loc),
-                Some(',') => Comma.to_ltok(*loc),
-                Some('.') => Dot.to_ltok(*loc),
-                Some('%') => Div.to_ltok(*loc),
-                Some('[') => match lin.peek() {
-                    Some(']') => { step(loc,lin); Nil.to_ltok(*loc) },
-                    _ => BrackOpen.to_ltok(*loc),
-                },
-                Some('<') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Leq.to_ltok(*loc) },
-                    _ => Lt.to_ltok(*loc),
-                },
-                Some('>') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Geq.to_ltok(*loc) },
-                    _ => Gt.to_ltok(*loc),
-                },
-                Some('!') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Neq.to_ltok(*loc) },
-                    _ => Not.to_ltok(*loc),
-                },
-                Some('=') => match lin.peek() {
-                    Some('=') => { step(loc,lin); Eq.to_ltok(*loc) },
-                    _ => Assign.to_ltok(*loc),
-                },
-                Some('&') => match lin.peek() {
-                    Some('&') => { step(loc,lin); And.to_ltok(*loc) },
-                    _ => TokFail("Found lone &".to_string()).to_ltok(*loc),
-                },
-                Some('|') => match lin.peek() {
-                    Some('|') => { step(loc,lin); Or.to_ltok(*loc) },
-                    _ => TokFail("Found lone |".to_string()).to_ltok(*loc),
-                },
-                //               Some('\'') => match lin.
-                //                    Char(step_or(loc,lin,"\' at end of line")?).to_ltok(*loc),
-                None => break,
-                x => TokFail("Unrecognized character".to_string()).to_ltok(*loc),
-            };
-            loc.advance();
+pub fn spl_parse(source: &str) -> ParseResult<SPL> {
+    let mut tokstream = lex::Lex::lex(source).peekable();
+    let mut ast = Vec::new();
+    let ts = &mut tokstream;
+    while let Some(Ok((tok,loc))) = ts.peek(){
+        ast.push(match tok {
+            Marker(Var) => {ts.next(); let (v,e) = var_init(ts)?; Decl::Var(None, v, e)},
+            TypeTok(_) | Marker(ParenOpen) |  Marker(BrackOpen) => {
+                let typ = non_id_type(ts)?;
+                let (v,e) = var_init(ts)?;
+                Decl::Var(Some(typ),v,e)
+            },
+            IdTok(i) => fun_or_named_type_var_decl(ts)?,
+            x => unexpected!(x,*loc,
+                "'var', 'Int', 'Bool', 'Char', '(', '[', or identifier")
         }
-        tokens
+        );
+
     }
-    */
+    match tokstream.next() {
+        None => Ok(ast),
+        Some(Err((msg,loc))) => fail!(msg,loc),
+        Some(Ok(_)) => panic!("`Some(Ok(_))` after `while let Some(Ok(_))`"),
+    }
+}
+
+fn var_init(ts: &mut TokStream) -> ParseResult<(Id,Exp)> {
+    unimplemented!();
+}
+
+fn non_id_type(ts: &mut TokStream) -> ParseResult<Type> {
+    unimplemented!();
+}
+
+fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
+    match ts.next(){
+        None => fail!("Ran out of tokens while parsing declaration with named type"),
+        Some(Ok((tok,loc))) => unimplemented!(), // parse
+        Some(Err(e)) => unimplemented!() //unexpected!(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::lex::*;
+    #[test]
+    fn test_sanity() {
+        assert!(true);
+    }
 }
