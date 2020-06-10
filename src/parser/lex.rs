@@ -93,7 +93,7 @@ pub(super) struct Lex<'s> {
     loc : Loc,
     chars : Peekable<CharIndices<'s>>,
     wordtoks : HashMap<&'s str,Token>,
-    names : Vec<&'s str>,
+    pub names : Vec<&'s str>,
     vcount : u32,
 }
 
@@ -163,9 +163,9 @@ impl Lex<'_>{
 
     fn parse_word(&mut self, start : usize) -> Token {
         let word : &str = loop {
-            match self.step() {
+            match self.chars.peek() {
                 Some((end,c)) => if !c.is_alphanumeric() {
-                    break &self.input[start..end]},
+                    break &self.input[start..*end]} else {self.step();},
                 None => break &self.input[start..],
             }
         };
@@ -324,13 +324,31 @@ mod tests {
         assert_eq!(tok,Token::Lit(Int(37)));
     }
 
-    // Test: changed lexing of negative numbers to be determined parser-stage.
+    // Change: lexing of negative numbers to be determined parser-stage.
+    // Bug fixed: don't parse 1 past the end of the number.
     #[test]
     fn lex_negnum() {
         let mut toks = Lex::lex("-42").map(|x| x.unwrap());
         assert_eq!(toks.next().unwrap(),(Token::Op(Minus),tloc(0,0,1)));
         assert_eq!(toks.next().unwrap(),(Token::Lit(Int(42)),tloc(0,1,2)));
         assert_eq!(toks.next(),None);
+    }
+
+    #[test]
+    fn lex_vars() {
+        let mut lexer = Lex::lex("foo b4r foo");
+        let mut toks = lexer.by_ref().map(|x| x.unwrap());
+        let footok = toks.next().unwrap();
+        let foo = match footok.0 {
+            Token::IdTok(x) => x,
+            _ => panic!(),
+        };
+        assert_eq!(footok,(Token::IdTok(foo),tloc(0,0,3)));
+        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo+1),tloc(0,4,3)));
+        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo),tloc(0,8,3)));
+        assert_eq!(toks.next(),None);
+        assert_eq!(lexer.names[foo as usize],"foo");
+        assert_eq!(lexer.names[(foo+1) as usize],"b4r");
     }
         
 }
