@@ -5,7 +5,7 @@ use std::iter::{Peekable};
 use std::num::ParseIntError;
 //use core::slice::{Iter};
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub(super) enum Misc {
     Var,
     If,
@@ -26,7 +26,7 @@ pub(super) enum Misc {
     TypeColon,
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub(super) enum Token {
     IdTok(u32),
     Selector(Selector),
@@ -153,9 +153,9 @@ impl Lex<'_>{
 
     fn parse_int(&mut self, start : usize) -> Result<i64,ParseIntError> {
         loop {
-            match self.step() {
+            match self.chars.peek() {
                 Some((end,c)) => if !c.is_digit(10) {
-                    return self.input[start..end].parse()},
+                    return self.input[start..*end].parse()} else {self.step();},
                 None => return self.input[start..].parse(),
             }
         }
@@ -269,10 +269,6 @@ impl Iterator for Lex<'_> {
             }
             '-' => match self.chars.peek().copied() {
                 Some((_,'>')) => Arrow.to_ltok(self.loc),
-                Some((numpos,x)) => match x.is_digit(10) {
-                    true => Int(-self.parse_int(numpos).unwrap()).to_ltok(self.loc),
-                    false => Minus.to_ltok(self.loc),
-                },
                 _ => Minus.to_ltok(self.loc),
             }
             '/' => match self.step_ch() {
@@ -295,3 +291,46 @@ impl Iterator for Lex<'_> {
     }
 }
 
+#[cfg(test)]
+mod tests {
+    use super::*;
+    fn tloc(line: u32, col: u16, len: u16) -> Loc {
+        Loc{line: line, col: col, len: len}
+    }
+
+    #[test]
+    fn test_sanity() {
+        assert!(true);
+    }
+    // Metatesting: multiple ways to lex a single token
+    #[test]
+    fn lex_plus() {
+        let mut toks = Lex::lex("+");
+        assert_eq!(toks.next(),Some(Ok((Token::Op(Plus),tloc(0, 0, 1)))));
+    }
+    #[test]
+    fn lex_comma() {
+        let mut toks = Lex::lex(",");
+        assert_eq!(toks.next().unwrap().unwrap().0,Token::Marker(Comma));
+    }
+    #[test]
+    fn lex_dot() {
+        let mut toks = Lex::lex(".").map(|x| x.unwrap().0);
+        assert_eq!(toks.next().unwrap(),Token::Marker(Dot));
+    }
+    #[test]
+    fn lex_num() {
+        let tok = Lex::lex("37").map(|x| x.unwrap().0).next().unwrap();
+        assert_eq!(tok,Token::Lit(Int(37)));
+    }
+
+    // Test: changed lexing of negative numbers to be determined parser-stage.
+    #[test]
+    fn lex_negnum() {
+        let mut toks = Lex::lex("-42").map(|x| x.unwrap());
+        assert_eq!(toks.next().unwrap(),(Token::Op(Minus),tloc(0,0,1)));
+        assert_eq!(toks.next().unwrap(),(Token::Lit(Int(42)),tloc(0,1,2)));
+        assert_eq!(toks.next(),None);
+    }
+        
+}

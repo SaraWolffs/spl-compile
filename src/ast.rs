@@ -1,4 +1,4 @@
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub struct Loc{
     pub line: u32,
     pub col: u16,
@@ -58,12 +58,12 @@ pub enum Type {
 
 pub type Id = Located<u32>; 
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum Selector {
     Hd, Tl, Fst, Snd
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum BType {
     IntT,
     BoolT,
@@ -71,7 +71,7 @@ pub enum BType {
     UnitT,
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum LitVal {
     Int(i64),
     Char(char),
@@ -79,10 +79,10 @@ pub enum LitVal {
     Nil,
 }
 
-#[derive(Copy,Clone,Debug)]
+#[derive(Copy,Clone,Debug,PartialEq)]
 pub enum Op {
     And, Or, Not,
     Lt, Leq, Gt, Geq, Eq, Neq, 
-    Plus, Minus, Mul, Div,
+    Plus, Minus, Mul, Div, Neg,
     Cons,
 }
