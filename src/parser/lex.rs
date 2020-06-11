@@ -97,8 +97,8 @@ pub(super) struct Lex<'s> {
     vcount : u32,
 }
 
-impl Lex<'_>{
-    pub fn lex<'s>(source: &'s str) -> Lex<'s>{
+impl<'sub, 's : 'sub> Lex<'s>{
+    pub fn lex(source: &'s str) -> Lex<'s>{
         use crate::parser::lex::Token::*;
         let mut keywords = HashMap::with_capacity(256);
         keywords.insert("var",Marker(Var));
@@ -151,6 +151,20 @@ impl Lex<'_>{
         })
     }
 
+    fn step_while(&mut self, start : usize, prop : fn(char) -> bool) -> &'sub str {
+        loop {
+            match self.chars.peek() {
+                Some((end,c)) => 
+                    if prop(*c) {
+                        self.step();
+                    } else {
+                        return &self.input[start..*end]
+                    }
+                None => return &self.input[start..]
+            }
+        }
+    }
+
     fn parse_int(&mut self, start : usize) -> Result<i64,ParseIntError> {
         loop {
             match self.chars.peek() {
@@ -169,10 +183,13 @@ impl Lex<'_>{
                 None => break &self.input[start..],
             }
         };
-        *self.wordtoks.entry(word).or_insert({
-                self.names.push(word);
-                self.vcount += 1;
-                crate::parser::lex::Token::IdTok(self.vcount-1)
+        let names = &mut self.names;
+        let vcount = &mut self.vcount;
+        let wordtoks = &mut self.wordtoks; // pacify the borrow checker
+        *wordtoks.entry(word).or_insert_with(|| {
+                names.push(word);
+                *vcount += 1;
+                crate::parser::lex::Token::IdTok(*vcount-1)
         })
     }
 
@@ -336,7 +353,7 @@ mod tests {
 
     #[test]
     fn lex_vars() {
-        let mut lexer = Lex::lex("foo b4r foo");
+        let mut lexer = Lex::lex("foo while b4r foo");
         let mut toks = lexer.by_ref().map(|x| x.unwrap());
         let footok = toks.next().unwrap();
         let foo = match footok.0 {
@@ -344,8 +361,9 @@ mod tests {
             _ => panic!(),
         };
         assert_eq!(footok,(Token::IdTok(foo),tloc(0,0,3)));
-        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo+1),tloc(0,4,3)));
-        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo),tloc(0,8,3)));
+        assert_eq!(toks.next().unwrap(),(Token::Marker(While),tloc(0,4,5)));
+        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo+1),tloc(0,10,3)));
+        assert_eq!(toks.next().unwrap(),(Token::IdTok(foo),tloc(0,14,3)));
         assert_eq!(toks.next(),None);
         assert_eq!(lexer.names[foo as usize],"foo");
         assert_eq!(lexer.names[(foo+1) as usize],"b4r");
