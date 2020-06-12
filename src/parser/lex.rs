@@ -44,7 +44,6 @@ trait TokAble  {
         where Self: std::marker::Sized {
         (self.to_tok(),l)
     }
-
 }
 
 impl TokAble for u32 {
@@ -152,6 +151,7 @@ impl<'sub, 's : 'sub> Lex<'s>{
     }
 
     fn step_while(&mut self, start : usize, prop : fn(char) -> bool) -> &'sub str {
+        assert!(prop(self.input[start..].chars().next().unwrap()));
         loop {
             match self.chars.peek() {
                 Some((end,c)) => 
@@ -166,23 +166,11 @@ impl<'sub, 's : 'sub> Lex<'s>{
     }
 
     fn parse_int(&mut self, start : usize) -> Result<i64,ParseIntError> {
-        loop {
-            match self.chars.peek() {
-                Some((end,c)) => if !c.is_digit(10) {
-                    return self.input[start..*end].parse()} else {self.step();},
-                None => return self.input[start..].parse(),
-            }
-        }
+        self.step_while(start, |c| {c.is_digit(10)}).parse()
     }
 
     fn parse_word(&mut self, start : usize) -> Token {
-        let word : &str = loop {
-            match self.chars.peek() {
-                Some((end,c)) => if !c.is_alphanumeric() {
-                    break &self.input[start..*end]} else {self.step();},
-                None => break &self.input[start..],
-            }
-        };
+        let word = self.step_while(start,char::is_alphanumeric);
         let names = &mut self.names;
         let vcount = &mut self.vcount;
         let wordtoks = &mut self.wordtoks; // pacify the borrow checker
