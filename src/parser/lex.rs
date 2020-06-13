@@ -329,6 +329,31 @@ mod tests {
         assert_eq!(tok,Token::Lit(Int(37)));
     }
 
+    #[test]
+    fn lex_twintok_leq() {
+        let mut toks = Lex::lex("<=").map(|x| x.unwrap().0);
+        assert_eq!(toks.next().unwrap(),Token::Op(Leq));
+    }
+
+    #[test]
+    fn lex_prefix_minus() {
+        let mut toks = Lex::lex("-").map(|x| x.unwrap().0);
+        assert_eq!(toks.next().unwrap(),Token::Op(Minus));
+    }
+
+    #[test]
+    fn lex_lone_slash() {
+        let mut toks = Lex::lex("/");
+        assert_eq!(toks.next().unwrap(),Err(("Found lone /".to_string(), tloc(0,0,1))));
+    }
+
+    #[test]
+    fn lex_linecomment() {
+        let mut toks = Lex::lex("// This should not lex as anything\n+");
+        assert_eq!(toks.next().unwrap().unwrap(),(Token::Op(Plus), tloc(1,0,1)));
+    }
+
+
     // Change: lexing of negative numbers to be determined parser-stage.
     // Bug fixed: don't parse 1 past the end of the number.
     #[test]
