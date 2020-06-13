@@ -276,9 +276,9 @@ impl Iterator for Lex<'_> {
                 Some((_,'>')) => Arrow.to_ltok(self.loc),
                 _ => Minus.to_ltok(self.loc),
             }
-            '/' => match self.step_ch() {
-                Some('/') => { self.line_comment(); return self.next() },
-                Some('*') => match self.block_comment() {
+            '/' => match self.ipeek() {
+                Some('/') => { self.step(); self.line_comment(); return self.next() },
+                Some('*') => match {self.step(); self.block_comment()} {
                     Err(l) => fail!("Unclosed block comment started",l),
                     Ok(()) => return self.next(),
                 },
