@@ -264,13 +264,13 @@ impl Iterator for Lex<'_> {
                 Some('|') => { self.step(); Or.to_ltok(self.loc) },
                 _ => fail!("Found lone |",self.loc),
             },
-            '\'' => match self.step_ch() {
+            '\'' => match self.ipeek() {
                 Some('\n') | None => fail!("\' at end of line",self.loc),
-                Some('\\') => match self.escape_char()? {
+                Some('\\') => match {self.step(); self.escape_char()?} {
                     Ok(x) => Char(x).to_ltok(self.loc),
                     Err(e) => fail!(e,self.loc),
                 },
-                Some(x) => Char(x).to_ltok(self.loc),
+                Some(x) => {self.step(); Char(x).to_ltok(self.loc)},
             }
             '-' => match self.chars.peek().copied() {
                 Some((_,'>')) => Arrow.to_ltok(self.loc),
@@ -351,6 +351,12 @@ mod tests {
     fn lex_linecomment() {
         let mut toks = Lex::lex("// This should not lex as anything\n+");
         assert_eq!(toks.next().unwrap().unwrap(),(Token::Op(Plus), tloc(1,0,1)));
+    }
+
+    #[test]
+    fn lex_char() {
+        let mut toks = Lex::lex("'a");
+        assert_eq!(toks.next().unwrap().unwrap(),(Token::Lit(Char('a')), tloc(0,0,2)));
     }
 
 
