@@ -35,6 +35,21 @@ macro_rules! lookahead {
     }
 }
 
+macro_rules! parserule { // TODO: remove ambiguity
+    ( $name:ident : $rettype:ty, $ts:ident, $loc:ident,
+      { $($cp:pat => $($cv:ident <- $cd:expr;)* $ce:expr,)* }, //consume
+      { $($dp:pat => $($dv:ident <- $dd:expr;)* $de:expr,)* }, //descend
+      $ifnone:expr) => { 
+        fn $name(ts: &mut TokStream) -> ParseResult<$rettype> {
+            lookahead!($ts,$loc, 
+                { $($cp => $($cv <- $cd;)* $ce,)*},
+                { $($dp => $($dv <- $dd;)* $de,)*},
+                $ifnone)
+        }
+    }
+}
+
+
 
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
     let mut tokstream = lex::Lex::lex(source).peekable();
@@ -60,6 +75,18 @@ pub fn spl_parse(source: &str) -> ParseResult<SPL> {
         Some(Err((msg,loc))) => fail!(msg,loc),
         Some(Ok(_)) => panic!("`Some(Ok(_))` after `while let Some(Ok(_))`"),
     }
+}
+
+parserule!{decl : Option<Decl>, ts, loc, { 
+    Marker(Var) => ve <- var_init(ts); Some(Decl::Var(None, ve.0, ve.1)),
+    IdTok(i) => fun_or_named_type_var_decl(ts,i),
+    },{ 
+    TypeTok(_) | Marker(ParenOpen) | Marker(BrackOpen) => 
+        typ <- non_id_type(ts);
+        ve <- var_init(ts);
+        Some(Decl::Var(Some(typ),ve.0,ve.1)),
+    },
+    Ok(None)
 }
 
 fn var_init(ts: &mut TokStream) -> ParseResult<(Id,Exp)> {
