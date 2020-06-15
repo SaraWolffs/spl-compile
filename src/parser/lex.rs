@@ -96,6 +96,7 @@ pub(super) struct Lex<'s> {
     vcount : u32,
 }
 
+
 impl<'sub, 's : 'sub> Lex<'s>{
     pub fn lex(source: &'s str) -> Lex<'s>{
         use crate::parser::lex::Token::*;
@@ -137,17 +138,18 @@ impl<'sub, 's : 'sub> Lex<'s>{
     }
 
     fn step_ch(&mut self) -> Option<char> {
+        let ret = Some(self.chars.next()?.1);
         self.loc.len += 1;
-        Some(self.chars.next()?.1)
+        ret
     }
 
-    fn escape_char(&mut self) -> Option<Result<char,&'static str>> {
-        Some(match self.step_ch()? {
-            'n' => Ok('\n'),
-            '\\' => Ok('\\'),
-            '\n' => Err("\'\\ at end of line"),
+    fn escape_char(&mut self) -> Result<char,&'static str> {
+        match self.step_ch() {
+            Some('n') => Ok('\n'),
+            Some('\\') => Ok('\\'),
+            Some('\n') | None => Err("\'\\ at end of line"),
             _ => Err("Unrecognized escape sequence"),
-        })
+        }
     }
 
     fn step_while(&mut self, start : usize, prop : fn(char) -> bool) -> &'sub str {
@@ -178,6 +180,13 @@ impl<'sub, 's : 'sub> Lex<'s>{
                 names.push(word);
                 *vcount += 1;
                 crate::parser::lex::Token::IdTok(*vcount-1)
+        })
+    }
+    fn parse_char(&mut self) -> Result<LocTok,&'static str> {
+        Ok(match self.step_ch() {
+            Some('\n') | None => return Err("\' at end of line"),
+            Some('\\') => Char(self.escape_char()?).to_ltok(self.loc),
+            Some(x) => Char(x).to_ltok(self.loc),
         })
     }
 
@@ -264,21 +273,17 @@ impl Iterator for Lex<'_> {
                 Some('|') => { self.step(); Or.to_ltok(self.loc) },
                 _ => fail!("Found lone |",self.loc),
             },
-            '\'' => match self.ipeek() {
-                Some('\n') | None => fail!("\' at end of line",self.loc),
-                Some('\\') => match {self.step(); self.escape_char()?} {
-                    Ok(x) => Char(x).to_ltok(self.loc),
-                    Err(e) => fail!(e,self.loc),
-                },
-                Some(x) => {self.step(); Char(x).to_ltok(self.loc)},
+            '\'' => match self.parse_char() {
+                Ok(c) => c,
+                Err(msg) => fail!(msg,self.loc),
             }
             '-' => match self.chars.peek().copied() {
                 Some((_,'>')) => Arrow.to_ltok(self.loc),
                 _ => Minus.to_ltok(self.loc),
             }
-            '/' => match self.ipeek() {
-                Some('/') => { self.step(); self.line_comment(); return self.next() },
-                Some('*') => match {self.step(); self.block_comment()} {
+            '/' => match self.step_ch() {
+                Some('/') => { self.line_comment(); return self.next() },
+                Some('*') => match self.block_comment() {
                     Err(l) => fail!("Unclosed block comment started",l),
                     Ok(()) => return self.next(),
                 },
