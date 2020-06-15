@@ -20,6 +20,21 @@ type ParseError = (String,Option<crate::ast::Loc>);
 
 type ParseResult<T> = Result<T,ParseError>;
 
+macro_rules! lookahead {
+    ( $ts:ident, $loc:ident, 
+      { $($cp:pat => $($cv:ident <- $cd:expr;)* $ce:expr,)* }, //consume
+      { $($dp:pat => $($dv:ident <- $dd:expr;)* $de:expr,)* }, //descend
+      $ifnone:expr) => { match $ts.peek() {
+        Some(Ok((tok,$loc))) => match tok {
+            $($cp => { $ts.next(); $(let $cv = $cd?;)* Ok($ce) },)*
+            $($dp => { $(let $dv = $dd?;)* Ok($de) },)*
+        },
+        Some(Err((msg,loc))) => fail!(msg,loc),
+        None => $ifnone,
+    }
+    }
+}
+
 
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
     let mut tokstream = lex::Lex::lex(source).peekable();
