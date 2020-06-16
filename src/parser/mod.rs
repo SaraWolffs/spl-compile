@@ -20,6 +20,7 @@ type ParseError = (String,Option<crate::ast::Loc>);
 
 type ParseResult<T> = Result<T,ParseError>;
 
+/* TODO: decide if this is worth salvaging
 macro_rules! lookahead {
     ( $ts:ident, $loc:ident, 
       { $($cp:pat => $($cv:ident <- $cd:expr;)* $ce:expr,)* }, //consume
@@ -48,7 +49,22 @@ macro_rules! parserule { // TODO: remove ambiguity
         }
     }
 }
+*/
 
+macro_rules! tokmatch {
+    ( $ts:ident, $loc:ident,
+      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
+      $ifnone:expr) => {
+        match $ts.next() {
+            Some(Ok((tok,$loc))) => match tok {
+                $($p => {$($subvar = $subparse)*; $return },)*,
+                x => unexpected!(x,loc,comma_sep_str!($(tokpat_to_str!($p)),*)),
+            },
+            Some(Err((msg,loc))) => fail!(msg,loc),
+            None => $ifnone,
+        }
+    }
+}
 
 
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
@@ -77,6 +93,7 @@ pub fn spl_parse(source: &str) -> ParseResult<SPL> {
     }
 }
 
+/*
 parserule!{decl : Option<Decl>, ts, loc, { 
     Marker(Var) => ve <- var_init(ts); Some(Decl::Var(None, ve.0, ve.1)),
     IdTok(i) => fun_or_named_type_var_decl(ts,i),
@@ -88,6 +105,7 @@ parserule!{decl : Option<Decl>, ts, loc, {
     },
     Ok(None)
 }
+*/
 
 fn var_init(ts: &mut TokStream) -> ParseResult<(Id,Exp)> {
     unimplemented!();
