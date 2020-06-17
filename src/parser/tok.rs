@@ -76,3 +76,26 @@ impl TokAble for Misc {
         Token::Marker(self)
     }
 }
+
+#[macro_export]
+macro_rules! tokpat_to_str {
+    (Marker(Var)) => { "'var'" };
+    (TypeTok(IntT)) => { "'Int'" };
+    (TypeTok(BoolT)) => { "'Bool'" };
+    (TypeTok(CharT)) => { "'Char'" };
+    (TypeTok(UnitT)) => { "'Void'" };
+    (TypeTok($t:pat)) => { "primitive type" };
+    (Marker(BracOpen)) => { "'{'" };
+    (Marker(ParenOpen)) => { "'('" };
+
+}
+
+mod test {
+    use super::*;
+    use super::Token::*;
+    #[test]
+    fn typetokpat_to_str() {
+        assert_eq!(tokpat_to_str!(TypeTok(_)), "primitive type");
+        assert_eq!(tokpat_to_str!(TypeTok(CharT)), "'Char'");
+    }
+}
