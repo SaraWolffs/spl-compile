@@ -1,8 +1,9 @@
 mod lex;
+mod tok;
 
 use crate::ast::*;
-use lex::Token::*;
-use lex::Misc::*;
+use tok::Token::*;
+use tok::Misc::*;
 type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
 
 macro_rules! unexpected {
