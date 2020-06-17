@@ -52,6 +52,12 @@ macro_rules! parserule { // TODO: remove ambiguity
 }
 */
 
+macro_rules! disjunction_str {
+    ($single:expr) => { $single };
+    ($first:expr, $second:expr) => { concat!($first, " or ", $second) };
+    ($($multi:expr,)+ $final:expr) => { concat!($($multi,", "),+, "or ", $final) };
+}
+
 macro_rules! tokmatch {
     ( $ts:ident, $loc:ident,
       { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
@@ -59,7 +65,7 @@ macro_rules! tokmatch {
         match $ts.next() {
             Some(Ok((tok,$loc))) => match tok {
                 $($p => {$($subvar = $subparse)*; $return },)*,
-                x => unexpected!(x,loc,comma_sep_str!($(tokpat_to_str!($p)),*)),
+                x => unexpected!(x,loc,disjunction_str!($(tokpat_to_str!($p)),*)),
             },
             Some(Err((msg,loc))) => fail!(msg,loc),
             None => $ifnone,
