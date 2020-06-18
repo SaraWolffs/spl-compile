@@ -1,10 +1,13 @@
 mod lex;
+#[macro_use]
 mod tok;
 
 use crate::ast::*;
 use tok::Token::*;
 use tok::Misc::*;
 type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
+
+
 
 macro_rules! unexpected {
     ( $found: expr, $loc : expr, $expected: expr ) => 
@@ -58,20 +61,53 @@ macro_rules! disjunction_str {
     ($($multi:expr,)+ $final:expr) => { concat!($($multi,", "),+, "or ", $final) };
 }
 
-macro_rules! tokmatch {
+macro_rules! tok_match {
+    ( $tok:expr, 
+      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* }) => {
+        match $tok {
+            $($p => {$($subvar = $subparse?;)* $return },)*,
+            x => unexpected!(x,loc,disjunction_str!($(tokpat_to_str!($p)),*)),
+        }
+    };
+}
+
+macro_rules! maybe_tok_match {
+    ( $maybetok:expr, $loc:ident,
+      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
+      $ifnone:expr) => {
+        match $maybetok {
+            Some(Ok((tok,$loc))) => tok_match!(tok, 
+                { $($p $(, $subvar = $subparse)* => $return,)* })
+        },
+        Some(Err((msg,loc))) => fail!(msg,loc),
+        None => $ifnone,
+    }
+}
+
+macro_rules! next_tok_match {
     ( $ts:ident, $loc:ident,
       { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
       $ifnone:expr) => {
-        match $ts.next() {
-            Some(Ok((tok,$loc))) => match tok {
-                $($p => {$($subvar = $subparse)*; $return },)*,
-                x => unexpected!(x,loc,disjunction_str!($(tokpat_to_str!($p)),*)),
-            },
-            Some(Err((msg,loc))) => fail!(msg,loc),
-            None => $ifnone,
+        maybe_tok_match($ts.next,$loc,
+                { $($p $(, $subvar = $subparse)* => $return,)* },
+                $ifnone)
+    }
+}
+
+macro_rules! eat_rule {
+    ( $name:ident ($ts:ident $(,$arg:ident : $argtype:ty)*) -> $retty:ty { 
+        match (tok at $loc:ident) 
+            { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)*
+              None => $ifnone:expr $(,)?}
+    }) => { 
+        fn $name($ts:TokStream $(,$arg : $argtype)*) -> ParseResult($retty) {
+            next_tok_match!($ts,$loc, 
+                { $($p $(, $subvar = $subparse)* => $return,)* }, 
+                $ifnone)
         }
     }
 }
+
 
 
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
@@ -137,4 +173,5 @@ mod tests {
     fn test_sanity() {
         assert!(true);
     }
+    
 }
