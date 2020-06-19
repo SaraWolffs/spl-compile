@@ -1,44 +1,24 @@
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub struct Loc{
-    pub line: u32,
-    pub col: u16,
-    pub len: u16,
-}
-
-pub struct Spanned {
+pub struct Span {
     pub startline:u32,
     pub endline:u32,
     pub startcol:u16,
     pub endcol:u16,
 }
 
-impl Loc { // TODO: guard against overflow
-    pub fn next_line(&mut self) {
-        self.line += 1;
-        self.col = 0;
-        self.len = 0;
-    }
-
-    pub fn advance(&mut self) {
-        self.col += self.len;
-        self.len = 0;
-    }
-
-    pub fn step(&mut self) {
-        self.len += 1;
-    }
-}
-
-pub type Located<T> = (T,Loc);
+pub type Spanned<T> = (T,Option<Span>);
 
 pub type SPL = Vec<Decl>;
 
-pub enum Decl {
+
+pub type Decl = Spanned<BareDecl>;
+pub enum BareDecl {
     Var(Option<Type>,Id,Exp),
     Fun(Id,Vec<Id>,Option<FunType>,Vec<Decl>,Vec<Stmt>)
 }
 
-pub enum Exp {
+pub type Exp = Spanned<BareExp>;
+pub enum BareExp {
     Var(Id,Vec<Selector>),
     Call(Id,Vec<Exp>),
     Lit(LitVal),
@@ -47,7 +27,8 @@ pub enum Exp {
     UnOp(Op,Box<Exp>)
 }
 
-pub enum Stmt {
+pub type Stmt = Spanned<BareStmt>;
+pub enum BareStmt {
     ITE(Exp,Vec<Stmt>,Vec<Stmt>),
     While(Exp,Vec<Stmt>),
     Assign(Id,Exp),
@@ -55,9 +36,11 @@ pub enum Stmt {
     Ret(Option<Exp>)
 }
 
-pub type FunType = (Vec<Type>,Type);
+pub type FunType = Spanned<BareFunType>;
+pub type BareFunType = (Vec<Type>,Type);
 
-pub enum Type {
+pub type Type = Spanned<BareType>;
+pub enum BareType {
     Lit(BType),
     Typename(Id),
     Tuple(Vec<Type>),
@@ -66,11 +49,14 @@ pub enum Type {
 
 
 /** Terminal symbols/tokens **/
+pub type Id = Spanned<BareId>;
 
-pub type Id = Located<u32>; 
+pub type BareId = u32; 
+
+pub type Selector = Spanned<BareSelector>;
 
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub enum Selector {
+pub enum BareSelector {
     Hd, Tl, Fst, Snd
 }
 
@@ -90,8 +76,10 @@ pub enum LitVal {
     Nil,
 }
 
+pub type Op = Spanned<BareOp>;
+
 #[derive(Copy,Clone,Debug,PartialEq)]
-pub enum Op {
+pub enum BareOp {
     And, Or, Not,
     Lt, Leq, Gt, Geq, Eq, Neq, 
     Plus, Minus, Mul, Div, Neg,

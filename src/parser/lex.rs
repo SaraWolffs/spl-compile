@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::str::{CharIndices};
-use crate::ast::{Selector,BType,LitVal,Op,Loc,Located};
+use crate::ast::{BareSelector,BType,LitVal,BareOp};
 use std::iter::{Peekable};
 use std::num::ParseIntError;
 //use core::slice::{Iter};
 
 
 use super::tok::*;
-use crate::ast::Selector::*;
+use crate::ast::BareSelector::*;
 use crate::ast::BType::*;
 use crate::ast::LitVal::*;
-use crate::ast::Op::*;
+use crate::ast::BareOp::*;
 use Misc::*;
 
 

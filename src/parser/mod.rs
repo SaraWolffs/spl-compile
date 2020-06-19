@@ -20,7 +20,7 @@ macro_rules! fail {
     ( $reason : expr ) => {return Err(($reason.to_string(),None))};
 }
 
-type ParseError = (String,Option<crate::ast::Loc>);
+type ParseError = (String,Option<tok::Loc>);
 
 type ParseResult<T> = Result<T,ParseError>;
 
@@ -119,7 +119,7 @@ macro_rules! eat_rule {
 }
 
 
-
+/* TODO: update and rewrite
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
     let mut tokstream = lex::Lex::lex(source).peekable();
     let mut ast = Vec::new();
@@ -145,6 +145,7 @@ pub fn spl_parse(source: &str) -> ParseResult<SPL> {
         Some(Ok(_)) => panic!("`Some(Ok(_))` after `while let Some(Ok(_))`"),
     }
 }
+*/
 
 /*
 parserule!{decl : Option<Decl>, ts, loc, { 

@@ -1,5 +1,31 @@
+use crate::ast::{BareId,BareSelector,BType,LitVal,BareOp};
 
-use crate::ast::{Selector,BType,LitVal,Op,Loc,Located};
+#[derive(Copy,Clone,Debug,PartialEq)]
+pub struct Loc{
+    pub line: u32,
+    pub col: u16,
+    pub len: u16,
+}
+
+impl Loc { // TODO: guard against overflow
+    pub fn next_line(&mut self) {
+        self.line += 1;
+        self.col = 0;
+        self.len = 0;
+    }
+
+    pub fn advance(&mut self) {
+        self.col += self.len;
+        self.len = 0;
+    }
+
+    pub fn step(&mut self) {
+        self.len += 1;
+    }
+}
+
+pub type Located<T> = (T,Loc);
+
 #[derive(Copy,Clone,Debug,PartialEq)]
 pub(super) enum Misc {
     Var,
@@ -23,11 +49,11 @@ pub(super) enum Misc {
 
 #[derive(Copy,Clone,Debug,PartialEq)]
 pub(super) enum Token {
-    IdTok(u32),
-    Selector(Selector),
+    IdTok(BareId),
+    Selector(BareSelector),
     TypeTok(BType),
     Lit(LitVal),
-    Op(Op),
+    Op(BareOp),
     Marker(Misc),
 }
 
@@ -43,11 +69,11 @@ pub(super) trait TokAble  {
 
 impl TokAble for u32 {
     fn to_tok(self) -> Token {
-        Token::IdTok(self)
+        Token::IdTok(self as BareId)
     }
 }
 
-impl TokAble for Selector {
+impl TokAble for BareSelector {
     fn to_tok(self) -> Token {
         Token::Selector(self)
     }
@@ -65,7 +91,7 @@ impl TokAble for LitVal {
     }
 }
 
-impl TokAble for Op {
+impl TokAble for BareOp {
     fn to_tok(self) -> Token {
         Token::Op(self)
     }
