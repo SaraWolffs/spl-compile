@@ -103,7 +103,17 @@ macro_rules! eat_rule {
         fn $name($ts:TokStream $(,$arg : $argtype)*) -> ParseResult($retty) {
             next_tok_match!($ts,$loc, 
                 { $($p $(, $subvar = $subparse)* => $return,)* }, 
-                $ifnone)
+                $ifnone,)
+        }
+    };
+    ( $name:ident ($ts:ident $(,$arg:ident : $argtype:ty)*) -> $retty:ty { 
+        match (tok at $loc:ident) 
+            { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr),* $(,)? }
+    }) => { 
+        fn $name($ts:TokStream $(,$arg : $argtype)*) -> ParseResult($retty) {
+            next_tok_match!($ts,$loc, 
+                { $($p $(, $subvar = $subparse)* => $return,)* }, 
+                unexpected!(None::<Token>,loc,disjunction_str!($(tokpat_to_str!($p)),*)),)
         }
     }
 }
@@ -165,6 +175,8 @@ fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
         Some(Err(e)) => unimplemented!() //unexpected!(),
     }
 }
+
+
 
 #[cfg(test)]
 mod tests {

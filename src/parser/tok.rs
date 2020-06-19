@@ -84,7 +84,7 @@ macro_rules! tokpat_to_str {
     (TypeTok(BoolT)) => { "'Bool'" };
     (TypeTok(CharT)) => { "'Char'" };
     (TypeTok(UnitT)) => { "'Void'" };
-    (TypeTok($t:pat)) => { "primitive type" };
+    (TypeTok($t:pat)) => { "base type" };
     (Marker(BracOpen)) => { "'{'" };
     (Marker(ParenOpen)) => { "'('" };
 
@@ -95,7 +95,7 @@ mod test {
     use super::Token::*;
     #[test]
     fn typetokpat_to_str() {
-        assert_eq!(tokpat_to_str!(TypeTok(_)), "primitive type");
+        assert_eq!(tokpat_to_str!(TypeTok(_)), "base type");
         assert_eq!(tokpat_to_str!(TypeTok(CharT)), "'Char'");
     }
 }

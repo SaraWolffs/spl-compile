@@ -25,7 +25,7 @@ pub(super) struct Lex<'s> {
 
 
 impl<'sub, 's : 'sub> Lex<'s>{
-    pub fn lex(source: &'s str) -> Lex<'s>{
+    pub fn lex(source: &'s str) -> Lex<'s>{ // TODO: remove loc.len+=, use loc.step()
         use super::tok::Token::*;
         let mut keywords = HashMap::with_capacity(256);
         keywords.insert("var",Marker(Var));

@@ -5,7 +5,14 @@ pub struct Loc{
     pub len: u16,
 }
 
-impl Loc {
+pub struct Spanned {
+    pub startline:u32,
+    pub endline:u32,
+    pub startcol:u16,
+    pub endcol:u16,
+}
+
+impl Loc { // TODO: guard against overflow
     pub fn next_line(&mut self) {
         self.line += 1;
         self.col = 0;
@@ -15,6 +22,10 @@ impl Loc {
     pub fn advance(&mut self) {
         self.col += self.len;
         self.len = 0;
+    }
+
+    pub fn step(&mut self) {
+        self.len += 1;
     }
 }
 
