@@ -3,6 +3,7 @@ mod lex;
 mod tok;
 
 use crate::ast::*;
+pub use tok::Loc;
 use tok::Token::*;
 use tok::Misc::*;
 type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
@@ -176,6 +177,17 @@ fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
         Some(Err(e)) => unimplemented!() //unexpected!(),
     }
 }
+/*
+eatrule!{ atom(ts) -> Exp {
+    match(tok at loc) {
+        IdTok(i) => field_or_call(ts,i,loc),
+        Lit(val) => (Lit(val),Some(loc)),
+        Marker(ParenOpen) => tuplish(ts, exp)
+
+    }
+}
+}
+*/
 
 
 

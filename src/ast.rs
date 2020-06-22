@@ -6,6 +6,13 @@ pub struct Span {
     pub endcol:u16,
 }
 
+impl From<&crate::parser::Loc> for Span {
+    fn from(loc: &crate::parser::Loc) -> Self {
+        Span { startline: loc.line, endline: loc.line, 
+               startcol: loc.col, endcol: loc.col+loc.len }
+    }
+}
+
 pub type Spanned<T> = (T,Option<Span>);
 
 pub type SPL = Vec<Decl>;
