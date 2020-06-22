@@ -17,14 +17,14 @@ pub enum BareDecl {
     Fun(Id,Vec<Id>,Option<FunType>,Vec<Decl>,Vec<Stmt>)
 }
 
-pub type Exp = Spanned<BareExp>;
+pub type Exp = Spanned<Typed<BareExp>>;
 pub enum BareExp {
     Var(Id,Vec<Selector>),
     Call(Id,Vec<Exp>),
     Lit(LitVal),
     Tuple(Vec<Exp>),
     BinOp(Op,Box<Exp>,Box<Exp>),
-    UnOp(Op,Box<Exp>)
+    UnOp(Op,Box<Exp>),
 }
 
 pub type Stmt = Spanned<BareStmt>;
@@ -33,7 +33,7 @@ pub enum BareStmt {
     While(Exp,Vec<Stmt>),
     Assign(Id,Exp),
     Call(Id,Vec<Exp>),
-    Ret(Option<Exp>)
+    Ret(Option<Exp>),
 }
 
 pub type FunType = Spanned<BareFunType>;
@@ -44,8 +44,10 @@ pub enum BareType {
     Lit(BType),
     Typename(Id),
     Tuple(Vec<Type>),
-    List(Box<Type>)
+    List(Box<Type>),
 }
+
+pub type Typed<T> = (T,Option<Type>);
 
 
 /** Terminal symbols/tokens **/
