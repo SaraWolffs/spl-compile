@@ -113,6 +113,8 @@ macro_rules! tokpat_to_str {
     (TypeTok($t:pat)) => { "base type" };
     (Marker(BracOpen)) => { "'{'" };
     (Marker(ParenOpen)) => { "'('" };
+    (IdTok($i:pat)) => { "identifier" };
+    (Lit($v:pat)) => { "literal" };
 
 }
 
@@ -123,5 +125,19 @@ mod test {
     fn typetokpat_to_str() {
         assert_eq!(tokpat_to_str!(TypeTok(_)), "base type");
         assert_eq!(tokpat_to_str!(TypeTok(CharT)), "'Char'");
+    }
+    #[test]
+    fn parenopen_to_str() {
+        assert_eq!(tokpat_to_str!(Marker(ParenOpen)), "'('");
+    }
+
+    #[test]
+    fn idtok_to_str() {
+        assert_eq!(tokpat_to_str!(IdTok(i)), "identifier");
+    }
+
+    #[test]
+    fn lit_to_str() {
+        assert_eq!(tokpat_to_str!(Lit(val)), "literal");
     }
 }

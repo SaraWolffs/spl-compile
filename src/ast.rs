@@ -6,12 +6,25 @@ pub struct Span {
     pub endcol:u16,
 }
 
-impl From<&crate::parser::Loc> for Span {
-    fn from(loc: &crate::parser::Loc) -> Self {
+impl From<crate::parser::Loc> for Span {
+    fn from(loc: crate::parser::Loc) -> Self {
         Span { startline: loc.line, endline: loc.line, 
                startcol: loc.col, endcol: loc.col+loc.len }
     }
 }
+
+impl Span {
+    fn hull(lhs: Self, rhs: Self) -> Self {
+        use core::cmp::min;
+        use core::cmp::max;
+        Span { startline: min(lhs.startline, rhs.startline),
+               endline: max(lhs.endline, rhs.endline),
+               startcol: if (lhs.startline <= rhs.startline) { lhs.startcol } else { rhs.startcol },
+               endcol: if (lhs.endline >= rhs.endline) { lhs.endcol } else { rhs.endcol },
+        }
+    }
+}
+
 
 pub type Spanned<T> = (T,Option<Span>);
 

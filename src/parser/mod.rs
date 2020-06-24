@@ -6,6 +6,7 @@ use crate::ast::*;
 pub use tok::Loc;
 use tok::Token::*;
 use tok::Misc::*;
+
 type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
 
 
@@ -59,14 +60,14 @@ macro_rules! parserule { // TODO: remove ambiguity
 macro_rules! disjunction_str {
     ($single:expr) => { $single };
     ($first:expr, $second:expr) => { concat!($first, " or ", $second) };
-    ($($multi:expr,)+ $final:expr) => { concat!($($multi,", "),+, "or ", $final) };
+    ($lead:expr, $($multi:expr),+) => { concat!($lead, ", ", disjunction_str!($($multi),+)) };
 }
 
 macro_rules! tok_match {
     ( $tok:expr, 
-      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* }) => {
+      { $($p:pat $(, $subvar:pat = $subparse:expr)*$(,)? => $return:expr,)* }) => {
         match $tok {
-            $($p => {$($subvar = $subparse?;)* $return },)*,
+            $($p => {$(let $subvar = $subparse?;)* $return },)*
             x => unexpected!(x,loc,disjunction_str!($(tokpat_to_str!($p)),*)),
         }
     };
@@ -74,51 +75,54 @@ macro_rules! tok_match {
 
 macro_rules! maybe_tok_match {
     ( $maybetok:expr, $loc:ident,
-      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
-      $ifnone:expr) => {
+      { $($p:pat $(, $subvar:pat = $subparse:expr)*$(,)? => $return:expr,)* },
+      $ifnone:expr $(,)?) => {
         match $maybetok {
             Some(Ok((tok,$loc))) => tok_match!(tok, 
-                { $($p $(, $subvar = $subparse)* => $return,)* })
-        },
+                { $($p $(, $subvar = $subparse)* => $return,)* }) ,
         Some(Err((msg,loc))) => fail!(msg,loc),
         None => $ifnone,
+        }
     }
 }
 
 macro_rules! next_tok_match {
     ( $ts:ident, $loc:ident,
-      { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)* },
-      $ifnone:expr) => {
-        maybe_tok_match($ts.next,$loc,
+      { $($p:pat $(, $subvar:pat = $subparse:expr)*$(,)? => $return:expr,)* },
+      $ifnone:expr $(,)?) => {
+        maybe_tok_match!($ts.next(),$loc,
                 { $($p $(, $subvar = $subparse)* => $return,)* },
                 $ifnone)
     }
 }
 
-macro_rules! eat_rule {
+macro_rules! eatrule {
     ( $name:ident ($ts:ident $(,$arg:ident : $argtype:ty)*) -> $retty:ty { 
         match (tok at $loc:ident) 
-            { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr,)*
-              None => $ifnone:expr $(,)?}
+            { $($p:pat $(, $subvar:pat = $subparse:expr)*$(,)? => $return:expr,)*
+              | $ifnone:expr $(,)?}
     }) => { 
-        fn $name($ts:TokStream $(,$arg : $argtype)*) -> ParseResult($retty) {
+        fn $name($ts:&mut TokStream $(,$arg : $argtype)*) -> ParseResult<$retty> {
             next_tok_match!($ts,$loc, 
                 { $($p $(, $subvar = $subparse)* => $return,)* }, 
                 $ifnone,)
         }
     };
-    ( $name:ident ($ts:ident $(,$arg:ident : $argtype:ty)*) -> $retty:ty { 
-        match (tok at $loc:ident) 
-            { $($p:pat $(, $subvar:pat = $subparse:expr)* => $return:expr),* $(,)? }
-    }) => { 
-        fn $name($ts:TokStream $(,$arg : $argtype)*) -> ParseResult($retty) {
-            next_tok_match!($ts,$loc, 
-                { $($p $(, $subvar = $subparse)* => $return,)* }, 
-                unexpected!(None::<Token>,loc,disjunction_str!($(tokpat_to_str!($p)),*)),)
-        }
-    }
 }
 
+macro_rules! peekrule {
+    ( $name:ident ($ts:ident $(,$arg:ident : $argtype:ty)*) -> $retty:ty { 
+        match (tok at $loc:ident) 
+            { $($p:pat $(, $subvar:pat = $subparse:expr)*$(,)? => $return:expr,)*
+              | $ifnone:expr $(,)?}
+    }) => { 
+        fn $name($ts:&mut TokStream $(,$arg : $argtype)*) -> ParseResult<$retty> {
+            maybe_tok_match!($ts.peek(),$loc, 
+                { $($p $(, $subvar = $subparse)* => $return,)* }, 
+                $ifnone,)
+        }
+    };
+}
 
 /* TODO: update and rewrite
 pub fn spl_parse(source: &str) -> ParseResult<SPL> {
@@ -177,18 +181,36 @@ fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
         Some(Err(e)) => unimplemented!() //unexpected!(),
     }
 }
-/*
+
 eatrule!{ atom(ts) -> Exp {
     match(tok at loc) {
-        IdTok(i) => field_or_call(ts,i,loc),
-        Lit(val) => (Lit(val),Some(loc)),
-        Marker(ParenOpen) => tuplish(ts, exp)
-
+        IdTok(i) => field_or_call(ts,(i,Some(loc.into()))),
+        Lit(val) => Ok(((BareExp::Lit(val), None), Some(loc.into()))),
+        Marker(ParenOpen), 
+            (coords, span) = tuplish(ts, exp),
+            => ((BareExp::Tuple(coords), None), Some(hull(loc.into(),span))),
+        | fail!("EOF while looking for primitive expression"),
     }
 }
 }
-*/
 
+
+peekrule! { field_or_call(ts, id:Id) -> Exp {
+    match(tok at loc) {
+        Marker(ParenOpen), 
+            _ = ts.next(),
+            (args, end) = tuplish(ts, exp),
+            => Ok(((Call(id,args), None), Some(hull(id.1,end)))),
+        x, (fld, end) = field(ts,x) 
+            => Ok(((BareExp::Var(id,fld),None), Some(hull(id.1,end)))),
+        | Ok(((BareExp::(Var,Vec::new()),None), Some(id.1))),
+    }
+}
+}
+
+fn tuplish<T>(ts: &mut TokStream, single: fn(&mut TokStream) -> T) -> ParseResult<(Vec<T>,Span)> {
+    todo!()
+}
 
 
 #[cfg(test)]
