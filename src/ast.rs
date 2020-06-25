@@ -14,7 +14,7 @@ impl From<crate::parser::Loc> for Span {
 }
 
 impl Span {
-    fn hull(lhs: Self, rhs: Self) -> Self {
+    pub(crate) fn hull(lhs: Self, rhs: Self) -> Self {
         use core::cmp::min;
         use core::cmp::max;
         Span { startline: min(lhs.startline, rhs.startline),

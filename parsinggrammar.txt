@@ -37,7 +37,7 @@ Atom = id FieldOrCall
  | int | char | 'False' | 'True' | '[]'
  | Tuplish_Exp                       {peek in {'('}}
 FieldOrCall = Field             {peek in <otherwise> }
-            | Tuplish_Exp ';'       {peek in {'('}}
+            | Tuplish_Exp       {peek in {'('}}
 Tuplish_a = '(' [ a ( ',' a )* ] ')'
 
 
