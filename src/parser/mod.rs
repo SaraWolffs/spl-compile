@@ -77,7 +77,7 @@ impl<'s> Parser<'s> {
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
-        todo!()
+        self.shunting_yard()
     }
 
     fn atom(&mut self) -> ParseResult<Exp> {
@@ -90,7 +90,12 @@ impl<'s> Parser<'s> {
                 LitTok(val) => Ok(((Lit(val), None), Some(loc.into()))),
                 Marker(ParenOpen) => { 
                     let (coords, span) = self.tuplish(Self::exp)?;
-                    Ok(((Tuple(coords), None), Some(hull(loc.into(),span))))},
+                    if (coords.len() == 1) {
+                        Ok((coords.into_iter().next().unwrap().0,Some(span)))
+                    } else {
+                        Ok(((Tuple(coords), None), Some(hull(loc.into(),span))))
+                    }
+                    }
                 x => unexpected!(x,loc,"identifier, literal, or '('")
             }
         }
@@ -117,6 +122,12 @@ impl<'s> Parser<'s> {
     }
 
     fn tuplish<T>(&mut self, single: fn(&mut Self) -> ParseResult<T>) -> ParseResult<(Vec<T>,Span)> {
+        todo!()
+    }
+
+    fn shunting_yard(&mut self) -> ParseResult<Exp> {
+        let mut opstack = Vec::<tok::Token>::with_capacity(8);
+        let mut outstack = Vec::<Exp>::with_capacity(8);
         todo!()
     }
 }
