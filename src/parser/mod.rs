@@ -77,7 +77,7 @@ impl<'s> Parser<'s> {
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
-        self.shunting_yard()
+        todo!() // call shunting yard
     }
 
     fn atom(&mut self) -> ParseResult<Exp> {
@@ -100,7 +100,6 @@ impl<'s> Parser<'s> {
             }
         }
     }
-
 
     fn field_or_call(&mut self, id: Id) -> ParseResult<Exp> {
         use BareExp::*;
@@ -126,11 +125,57 @@ impl<'s> Parser<'s> {
     }
 
     fn shunting_yard(&mut self) -> ParseResult<Exp> {
+        // TODO: move all of this to ShuntingYard
         let mut opstack = Vec::<tok::Token>::with_capacity(8);
         let mut outstack = Vec::<Exp>::with_capacity(8);
-        todo!()
+        
+        assert!(outstack.len() == 1);
+        Ok(outstack.pop().unwrap())
     }
 }
+
+#[derive(Copy,Clone,Debug,PartialEq)]
+enum ShuntState {
+    Expression, Operator, Done,
+}
+
+struct ShuntingYard<'s> {
+    state : ShuntState,
+    parser : &'s mut Parser<'s>,
+    opstack : Vec<tok::LocTok>,
+    outstack : Vec<Exp>,
+    lasttok : Option<tok::LocTok>,
+}
+
+
+impl<'s> ShuntingYard<'s> {
+    fn shunt_expr(&mut self) -> ParseResult<()> {
+        use ShuntState::*;
+        use crate::ast::BareOp::*;
+        assert!(self.state == Expression);
+        match self.parser.peektok() { // Expect expression
+            None => { 
+                self.lasttok = None; 
+                self.state = Done;
+            }
+            Some(Err((msg,loc))) => fail!(msg,*loc),
+            Some(Ok((tok,loc))) => match tok {
+                Op(Minus) => { 
+                    self.opstack.push((Op(Neg),*loc)); 
+                    self.parser.nexttok(); 
+                    self.state = Expression;
+                },
+                Marker(ParenOpen) => { 
+                    self.outstack.push(self.parser.atom()?); 
+                    self.state = Operator;
+                },
+                _ => todo!()
+            }
+        }
+        Ok(())
+    }
+}
+
 
 #[cfg(test)]
 mod tests {
