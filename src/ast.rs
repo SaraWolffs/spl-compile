@@ -1,63 +1,74 @@
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub struct Span {
-    pub startline:u32,
-    pub endline:u32,
-    pub startcol:u16,
-    pub endcol:u16,
+    pub startline: u32,
+    pub endline: u32,
+    pub startcol: u16,
+    pub endcol: u16,
 }
 
 impl From<crate::parser::Loc> for Span {
     fn from(loc: crate::parser::Loc) -> Self {
-        Span { startline: loc.line, endline: loc.line, 
-               startcol: loc.col, endcol: loc.col+loc.len }
+        Span {
+            startline: loc.line,
+            endline: loc.line,
+            startcol: loc.col,
+            endcol: loc.col + loc.len,
+        }
     }
 }
 
 impl Span {
     pub(crate) fn hull(lhs: Self, rhs: Self) -> Self {
-        use core::cmp::min;
         use core::cmp::max;
-        Span { startline: min(lhs.startline, rhs.startline),
-               endline: max(lhs.endline, rhs.endline),
-               startcol: if (lhs.startline <= rhs.startline) { lhs.startcol } else { rhs.startcol },
-               endcol: if (lhs.endline >= rhs.endline) { lhs.endcol } else { rhs.endcol },
+        use core::cmp::min;
+        Span {
+            startline: min(lhs.startline, rhs.startline),
+            endline: max(lhs.endline, rhs.endline),
+            startcol: if (lhs.startline <= rhs.startline) {
+                lhs.startcol
+            } else {
+                rhs.startcol
+            },
+            endcol: if (lhs.endline >= rhs.endline) {
+                lhs.endcol
+            } else {
+                rhs.endcol
+            },
         }
     }
 }
 
-
-pub type Spanned<T> = (T,Option<Span>);
+pub type Spanned<T> = (T, Option<Span>);
 
 pub type SPL = Vec<Decl>;
 
-
 pub type Decl = Spanned<BareDecl>;
 pub enum BareDecl {
-    Var(Option<Type>,Id,Exp),
-    Fun(Id,Vec<Id>,Option<FunType>,Vec<Decl>,Vec<Stmt>)
+    Var(Option<Type>, Id, Exp),
+    Fun(Id, Vec<Id>, Option<FunType>, Vec<Decl>, Vec<Stmt>),
 }
 
 pub type Exp = Spanned<Typed<BareExp>>;
 pub enum BareExp {
-    Var(Id,Vec<Selector>),
-    Call(Id,Vec<Exp>),
+    Var(Id, Vec<Selector>),
+    Call(Id, Vec<Exp>),
     Lit(LitVal),
     Tuple(Vec<Exp>),
-    BinOp(Op,Box<Exp>,Box<Exp>),
-    UnOp(Op,Box<Exp>),
+    BinOp(Op, Box<Exp>, Box<Exp>),
+    UnOp(Op, Box<Exp>),
 }
 
 pub type Stmt = Spanned<BareStmt>;
 pub enum BareStmt {
-    ITE(Exp,Vec<Stmt>,Vec<Stmt>),
-    While(Exp,Vec<Stmt>),
-    Assign(Id,Exp),
-    Call(Id,Vec<Exp>),
+    ITE(Exp, Vec<Stmt>, Vec<Stmt>),
+    While(Exp, Vec<Stmt>),
+    Assign(Id, Exp),
+    Call(Id, Vec<Exp>),
     Ret(Option<Exp>),
 }
 
 pub type FunType = Spanned<BareFunType>;
-pub type BareFunType = (Vec<Type>,Type);
+pub type BareFunType = (Vec<Type>, Type);
 
 pub type Type = Spanned<BareType>;
 pub enum BareType {
@@ -67,22 +78,24 @@ pub enum BareType {
     List(Box<Type>),
 }
 
-pub type Typed<T> = (T,Option<Type>);
-
+pub type Typed<T> = (T, Option<Type>);
 
 /** Terminal symbols/tokens **/
 pub type Id = Spanned<BareId>;
 
-pub type BareId = u32; 
+pub type BareId = u32;
 
 pub type Selector = Spanned<BareSelector>;
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BareSelector {
-    Hd, Tl, Fst, Snd
+    Hd,
+    Tl,
+    Fst,
+    Snd,
 }
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BType {
     IntT,
     BoolT,
@@ -90,7 +103,7 @@ pub enum BType {
     UnitT,
 }
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LitVal {
     Int(i64),
     Char(char),
@@ -100,10 +113,21 @@ pub enum LitVal {
 
 pub type Op = Spanned<BareOp>;
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BareOp {
-    And, Or, Not,
-    Lt, Leq, Gt, Geq, Eq, Neq, 
-    Plus, Minus, Mul, Div, Neg,
+    And,
+    Or,
+    Not,
+    Lt,
+    Leq,
+    Gt,
+    Geq,
+    Eq,
+    Neq,
+    Plus,
+    Minus,
+    Mul,
+    Div,
+    Neg,
     Cons,
 }

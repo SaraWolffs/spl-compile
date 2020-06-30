@@ -1,13 +1,14 @@
-use crate::ast::{BareId,BareSelector,BType,LitVal,BareOp};
+use crate::ast::{BType, BareId, BareOp, BareSelector, LitVal};
 
-#[derive(Copy,Clone,Debug,PartialEq)]
-pub struct Loc{
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct Loc {
     pub line: u32,
     pub col: u16,
     pub len: u16,
 }
 
-impl Loc { // TODO: guard against overflow
+impl Loc {
+    // TODO: guard against overflow
     pub fn next_line(&mut self) {
         self.line += 1;
         self.col = 0;
@@ -24,9 +25,9 @@ impl Loc { // TODO: guard against overflow
     }
 }
 
-pub type Located<T> = (T,Loc);
+pub type Located<T> = (T, Loc);
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) enum Misc {
     Var,
     If,
@@ -47,7 +48,7 @@ pub(super) enum Misc {
     TypeColon,
 }
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) enum Token {
     IdTok(BareId),
     Selector(BareSelector),
@@ -59,11 +60,13 @@ pub(super) enum Token {
 
 pub(super) type LocTok = Located<Token>;
 
-pub(super) trait TokAble  {
+pub(super) trait TokAble {
     fn to_tok(self) -> Token;
-    fn to_ltok(self,l:Loc) -> LocTok 
-        where Self: std::marker::Sized {
-        (self.to_tok(),l)
+    fn to_ltok(self, l: Loc) -> LocTok
+    where
+        Self: std::marker::Sized,
+    {
+        (self.to_tok(), l)
     }
 }
 
@@ -105,22 +108,41 @@ impl TokAble for Misc {
 
 #[macro_export]
 macro_rules! tokpat_to_str {
-    (Marker(Var)) => { "'var'" };
-    (TypeTok(IntT)) => { "'Int'" };
-    (TypeTok(BoolT)) => { "'Bool'" };
-    (TypeTok(CharT)) => { "'Char'" };
-    (TypeTok(UnitT)) => { "'Void'" };
-    (TypeTok($t:pat)) => { "base type" };
-    (Marker(BracOpen)) => { "'{'" };
-    (Marker(ParenOpen)) => { "'('" };
-    (IdTok($i:pat)) => { "identifier" };
-    (Lit($v:pat)) => { "literal" };
-
+    (Marker(Var)) => {
+        "'var'"
+    };
+    (TypeTok(IntT)) => {
+        "'Int'"
+    };
+    (TypeTok(BoolT)) => {
+        "'Bool'"
+    };
+    (TypeTok(CharT)) => {
+        "'Char'"
+    };
+    (TypeTok(UnitT)) => {
+        "'Void'"
+    };
+    (TypeTok($t:pat)) => {
+        "base type"
+    };
+    (Marker(BracOpen)) => {
+        "'{'"
+    };
+    (Marker(ParenOpen)) => {
+        "'('"
+    };
+    (IdTok($i:pat)) => {
+        "identifier"
+    };
+    (Lit($v:pat)) => {
+        "literal"
+    };
 }
 
 mod test {
-    use super::*;
     use super::Token::*;
+    use super::*;
     #[test]
     fn typetokpat_to_str() {
         assert_eq!(tokpat_to_str!(TypeTok(_)), "base type");

@@ -2,47 +2,55 @@ mod lex;
 #[macro_use]
 mod tok;
 
-use crate::ast::*;
 use crate::ast::Selector;
 use crate::ast::Span;
+use crate::ast::*;
 use lex::Lex;
 
 pub use tok::Loc;
-use tok::Token::*;
 use tok::Misc::*;
 use tok::Token::Lit as LitTok;
 use tok::Token::Selector as SelectTok;
-
+use tok::Token::*;
 
 type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
 
 pub struct Parser<'s> {
-    ts : TokStream<'s>,
-    lexer : lex::Lex<'s>,
+    ts: TokStream<'s>,
+    lexer: lex::Lex<'s>,
 }
-    
 
 macro_rules! unexpected {
-    ( $found: expr, $loc : expr, $expected: expr ) => 
-    {return Err((format!("Unexpected {:?} encountered while looking for {}",
-            $found, $expected),Some($loc)))};
+    ( $found: expr, $loc : expr, $expected: expr ) => {
+        return Err((
+            format!(
+                "Unexpected {:?} encountered while looking for {}",
+                $found, $expected
+            ),
+            Some($loc),
+        ));
+    };
 }
 
 macro_rules! fail {
-    ( $reason : expr, $loc : expr ) => {return Err(($reason.to_string(),Some($loc)))};
-    ( $reason : expr ) => {return Err(($reason.to_string(),None))};
+    ( $reason : expr, $loc : expr ) => {
+        return Err(($reason.to_string(), Some($loc)));
+    };
+    ( $reason : expr ) => {
+        return Err(($reason.to_string(), None));
+    };
 }
 
-type ParseError = (String,Option<tok::Loc>);
+type ParseError = (String, Option<tok::Loc>);
 
-type ParseResult<T> = Result<T,ParseError>;
+type ParseResult<T> = Result<T, ParseError>;
 
-fn opthull(lhs:Option<Span>,rhs:Option<Span>) -> Option<Span> {
-    Some(Span::hull(lhs?,rhs?))
+fn opthull(lhs: Option<Span>, rhs: Option<Span>) -> Option<Span> {
+    Some(Span::hull(lhs?, rhs?))
 }
 
-fn hull(lhs:Span,rhs:Span) -> Span {
-    Span::hull(lhs,rhs)
+fn hull(lhs: Span, rhs: Span) -> Span {
+    Span::hull(lhs, rhs)
 }
 
 impl<'s> Parser<'s> {
@@ -54,7 +62,7 @@ impl<'s> Parser<'s> {
         self.ts.peek()
     }
 
-    fn var_init(&mut self) -> ParseResult<(Id,Exp)> {
+    fn var_init(&mut self) -> ParseResult<(Id, Exp)> {
         todo!();
     }
 
@@ -72,7 +80,7 @@ impl<'s> Parser<'s> {
     }
     */
 
-    fn field(&mut self) -> ParseResult<(Vec<Selector>,Span)> {
+    fn field(&mut self) -> ParseResult<(Vec<Selector>, Span)> {
         todo!()
     }
 
@@ -82,45 +90,48 @@ impl<'s> Parser<'s> {
 
     fn atom(&mut self) -> ParseResult<Exp> {
         use BareExp::*;
-        match(self.nexttok()) {
+        match (self.nexttok()) {
             None => fail!("EOF while looking for identifier, literal, or '('"),
-            Some(Err((msg,loc))) => fail!(msg,loc),
-            Some(Ok((tok,loc))) => match tok {
-                IdTok(i) => self.field_or_call((i,Some(loc.into()))),
+            Some(Err((msg, loc))) => fail!(msg, loc),
+            Some(Ok((tok, loc))) => match tok {
+                IdTok(i) => self.field_or_call((i, Some(loc.into()))),
                 LitTok(val) => Ok(((Lit(val), None), Some(loc.into()))),
-                Marker(ParenOpen) => { 
+                Marker(ParenOpen) => {
                     let (coords, span) = self.tuplish(Self::exp)?;
                     if (coords.len() == 1) {
-                        Ok((coords.into_iter().next().unwrap().0,Some(span)))
+                        Ok((coords.into_iter().next().unwrap().0, Some(span)))
                     } else {
-                        Ok(((Tuple(coords), None), Some(hull(loc.into(),span))))
+                        Ok(((Tuple(coords), None), Some(hull(loc.into(), span))))
                     }
-                    }
-                x => unexpected!(x,loc,"identifier, literal, or '('")
-            }
+                }
+                x => unexpected!(x, loc, "identifier, literal, or '('"),
+            },
         }
     }
 
     fn field_or_call(&mut self, id: Id) -> ParseResult<Exp> {
         use BareExp::*;
-        match(self.peektok()) {
-            None => Ok(((Var(id,Vec::new()),None), id.1)),
-            Some(Err((msg,loc))) => fail!(msg,*loc),
-            Some(Ok((tok,loc))) => match tok {
+        match (self.peektok()) {
+            None => Ok(((Var(id, Vec::new()), None), id.1)),
+            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(Ok((tok, loc))) => match tok {
                 Marker(ParenOpen) => {
                     self.nexttok();
                     let (args, end) = self.tuplish(Self::exp)?;
-                    Ok(((Call(id,args), None), opthull(id.1,Some(end))))
+                    Ok(((Call(id, args), None), opthull(id.1, Some(end))))
                 }
                 x => {
                     let (fld, end) = self.field()?;
-                    Ok(((Var(id,fld),None), opthull(id.1,Some(end))))
+                    Ok(((Var(id, fld), None), opthull(id.1, Some(end))))
                 }
-            }
+            },
         }
     }
 
-    fn tuplish<T>(&mut self, single: fn(&mut Self) -> ParseResult<T>) -> ParseResult<(Vec<T>,Span)> {
+    fn tuplish<T>(
+        &mut self,
+        single: fn(&mut Self) -> ParseResult<T>,
+    ) -> ParseResult<(Vec<T>, Span)> {
         todo!()
     }
 
@@ -128,54 +139,55 @@ impl<'s> Parser<'s> {
         // TODO: move all of this to ShuntingYard
         let mut opstack = Vec::<tok::Token>::with_capacity(8);
         let mut outstack = Vec::<Exp>::with_capacity(8);
-        
+
         assert!(outstack.len() == 1);
         Ok(outstack.pop().unwrap())
     }
 }
 
-#[derive(Copy,Clone,Debug,PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq)]
 enum ShuntState {
-    Expression, Operator, Done,
+    Expression,
+    Operator,
+    Done,
 }
 
 struct ShuntingYard<'s> {
-    state : ShuntState,
-    parser : &'s mut Parser<'s>,
-    opstack : Vec<tok::LocTok>,
-    outstack : Vec<Exp>,
-    lasttok : Option<tok::LocTok>,
+    state: ShuntState,
+    parser: &'s mut Parser<'s>,
+    opstack: Vec<tok::LocTok>,
+    outstack: Vec<Exp>,
+    lasttok: Option<tok::LocTok>,
 }
-
 
 impl<'s> ShuntingYard<'s> {
     fn shunt_expr(&mut self) -> ParseResult<()> {
-        use ShuntState::*;
         use crate::ast::BareOp::*;
+        use ShuntState::*;
         assert!(self.state == Expression);
-        match self.parser.peektok() { // Expect expression
-            None => { 
-                self.lasttok = None; 
+        match self.parser.peektok() {
+            // Expect expression
+            None => {
+                self.lasttok = None;
                 self.state = Done;
             }
-            Some(Err((msg,loc))) => fail!(msg,*loc),
-            Some(Ok((tok,loc))) => match tok {
-                Op(Minus) => { 
-                    self.opstack.push((Op(Neg),*loc)); 
-                    self.parser.nexttok(); 
+            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(Ok((tok, loc))) => match tok {
+                Op(Minus) => {
+                    self.opstack.push((Op(Neg), *loc));
+                    self.parser.nexttok();
                     self.state = Expression;
-                },
-                Marker(ParenOpen) => { 
-                    self.outstack.push(self.parser.atom()?); 
+                }
+                Marker(ParenOpen) => {
+                    self.outstack.push(self.parser.atom()?);
                     self.state = Operator;
-                },
-                _ => todo!()
-            }
+                }
+                _ => todo!(),
+            },
         }
         Ok(())
     }
 }
-
 
 #[cfg(test)]
 mod tests {
@@ -184,5 +196,4 @@ mod tests {
     fn test_sanity() {
         assert!(true);
     }
-    
 }
