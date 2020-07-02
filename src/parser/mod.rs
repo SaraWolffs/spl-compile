@@ -166,27 +166,34 @@ impl<'s> ShuntingYard<'s> {
         use ShuntState::*;
         assert!(self.state == Expression);
         match self.parser.peektok() {
+            Some(Ok((Op(Minus), loc))) => {
+                self.opstack.push((Op(Neg), *loc));
+                self.parser.nexttok();
+                self.state = Expression;
+            }
+            Some(Ok((Op(Not), loc))) => {
+                self.opstack.push((Op(Not), *loc));
+                self.parser.nexttok();
+                self.state = Expression;
+            }
+            _ => {
+                self.outstack.push(self.parser.atom()?);
+                self.state = Operator;
+            }
+        }
+        Ok(())
+    }
+
+    fn shunt_op(&mut self) -> ParseResult<()> {
+        use crate::ast::BareOp::*;
+        use ShuntState::*;
+        assert!(self.state == Expression);
+        match self.parser.peektok() {
             None => {
                 self.lasttok = None;
                 self.state = Done;
             }
-            Some(Err((msg, loc))) => fail!(msg, *loc),
-            Some(Ok((tok, loc))) => match tok {
-                Op(Minus) => {
-                    self.opstack.push((Op(Neg), *loc));
-                    self.parser.nexttok();
-                    self.state = Expression;
-                }
-                Op(Not) => {
-                    self.opstack.push((Op(Not), *loc));
-                    self.parser.nexttok();
-                    self.state = Expression;
-                }
-                _ => {
-                    self.outstack.push(self.parser.atom()?);
-                    self.state = Operator;
-                }
-            },
+            _ => todo!(),
         }
         Ok(())
     }
