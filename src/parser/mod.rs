@@ -161,12 +161,11 @@ struct ShuntingYard<'s> {
 }
 
 impl<'s> ShuntingYard<'s> {
-    fn shunt_expr(&mut self) -> ParseResult<()> {
+    fn shunt_atom(&mut self) -> ParseResult<()> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert!(self.state == Expression);
         match self.parser.peektok() {
-            // Expect expression
             None => {
                 self.lasttok = None;
                 self.state = Done;
@@ -178,11 +177,15 @@ impl<'s> ShuntingYard<'s> {
                     self.parser.nexttok();
                     self.state = Expression;
                 }
-                Marker(ParenOpen) => {
+                Op(Not) => {
+                    self.opstack.push((Op(Not), *loc));
+                    self.parser.nexttok();
+                    self.state = Expression;
+                }
+                _ => {
                     self.outstack.push(self.parser.atom()?);
                     self.state = Operator;
                 }
-                _ => todo!(),
             },
         }
         Ok(())
