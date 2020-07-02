@@ -184,7 +184,7 @@ impl<'s> ShuntingYard<'s> {
         Ok(())
     }
 
-    fn shunt_op(&mut self) -> ParseResult<()> {
+    fn shunt_binop(&mut self) -> ParseResult<()> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert!(self.state == Expression);
@@ -192,6 +192,13 @@ impl<'s> ShuntingYard<'s> {
             None => {
                 self.lasttok = None;
                 self.state = Done;
+            }
+            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", *loc),
+            Some(Ok((Op(op), loc))) => {
+                // TODO: implement precedence rules
+                self.opstack.push((Op(*op), *loc));
+                self.state = Expression;
             }
             _ => todo!(),
         }
