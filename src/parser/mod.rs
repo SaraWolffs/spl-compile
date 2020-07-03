@@ -196,12 +196,17 @@ impl<'s> ShuntingYard<'s> {
             Some(Err((msg, loc))) => fail!(msg, *loc),
             Some(Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", *loc),
             Some(Ok((Op(op), loc))) => {
-                // TODO: implement precedence rules
-                self.opstack.push((Op(*op), *loc));
+                let op_own = *op;
+                let loc_own = *loc; // for the borrow checker
+                self.oppush(op_own, loc_own)?;
                 self.state = Expression;
             }
-            _ => todo!(),
+            Some(Ok((tok, loc))) => todo!(),
         }
+        Ok(())
+    }
+
+    fn oppush(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<()> {
         Ok(())
     }
 }
