@@ -157,7 +157,8 @@ struct ShuntingYard<'s> {
     parser: &'s mut Parser<'s>,
     opstack: Vec<tok::LocTok>,
     outstack: Vec<Exp>,
-    lasttok: Option<tok::LocTok>,
+    lastloc: Option<tok::Loc>,
+    lasttok: Option<tok::Token>,
 }
 
 impl<'s> ShuntingYard<'s> {
@@ -206,7 +207,45 @@ impl<'s> ShuntingYard<'s> {
         Ok(())
     }
 
+    fn oppeek(&mut self) -> Option<tok::LocTok> {
+        self.opstack.iter().rev().next().map(ToOwned::to_owned)
+    }
+
+    fn oppop(&mut self) -> Option<tok::LocTok> {
+        self.opstack.pop()
+    }
+
+    fn can_push(&mut self, op: crate::ast::BareOp) -> ParseResult<bool> {
+        Ok(match self.oppeek() {
+            None => true,
+            Some((Op(stacked), _)) => op.precedes(stacked),
+            _ => {
+                return Err((
+                    "Internal parser error: non-operator on operator stack".to_string(),
+                    self.lastloc,
+                ))
+            }
+        })
+    }
+
+    fn opapply(&mut self, op: crate::ast::BareOp) -> ParseResult<()> {
+        todo!()
+    }
+
     fn oppush(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<()> {
+        while !self.can_push(op)? {
+            if let (Op(popped), _) = self.oppop().ok_or((
+                "Internal parser error: Popped from empty operator stack".to_string(),
+                self.lastloc,
+            ))? {
+                self.opapply(popped)?;
+            } else {
+                return Err((
+                    "Internal parser error: non-operator on operator stack".to_string(),
+                    self.lastloc,
+                ));
+            }
+        }
         Ok(())
     }
 }

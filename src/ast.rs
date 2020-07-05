@@ -131,3 +131,31 @@ pub enum BareOp {
     Neg,
     Cons,
 }
+
+type Priority = u8;
+impl BareOp {
+    pub fn prio(self) -> Priority {
+        use BareOp::*;
+        match self {
+            Cons => 15,
+            Or => 20,
+            And => 30,
+            Eq => 40,
+            Neq => 40,
+            Not => 50,
+            Lt => 60,
+            Leq => 60,
+            Gt => 60,
+            Geq => 60,
+            Plus => 70,
+            Minus => 70,
+            Neg => 75,
+            Mul => 80,
+            Div => 80,
+        }
+    }
+
+    pub fn precedes(self, rhs: Self) -> bool {
+        self.prio() > rhs.prio() || (self.prio() == rhs.prio() && (self.prio() % 2 == 1))
+    }
+}
