@@ -163,6 +163,40 @@ struct ShuntingYard<'s> {
 }
 
 impl<'s> ShuntingYard<'s> {
+    fn new(parser: &'s mut Parser<'s>) -> ShuntingYard<'s> {
+        ShuntingYard {
+            state: ShuntState::Expression,
+            parser: parser,
+            opstack: Vec::new(),
+            outstack: Vec::with_capacity(1),
+            lastloc: None,
+            lasttok: None,
+        }
+    }
+
+    fn step(&mut self) -> ParseResult<()> {
+        use ShuntState::*;
+        match self.state {
+            Expression => self.shunt_atom()?,
+            Operator => self.shunt_binop()?,
+            Done => self.oppop()?,
+        }
+        Ok(())
+    }
+
+    fn run(&mut self) -> ParseResult<Exp> {
+        while self.state != ShuntState::Done {
+            self.step()?;
+        }
+        loop {
+            if self.outstack.len() == 1 && self.opstack.is_empty() {
+                break Ok(self.outstack.pop().unwrap());
+            } else {
+                self.step()?;
+            }
+        }
+    }
+
     fn shunt_atom(&mut self) -> ParseResult<()> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
@@ -225,10 +259,6 @@ impl<'s> ShuntingYard<'s> {
         self.opstack.iter().rev().next().map(ToOwned::to_owned)
     }
 
-    fn oppop(&mut self) -> Option<tok::LocTok> {
-        self.opstack.pop()
-    }
-
     fn can_push(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<bool> {
         Ok(match self.oppeek() {
             None => true,
@@ -265,21 +295,25 @@ impl<'s> ShuntingYard<'s> {
         Ok(())
     }
 
+    fn oppop(&mut self) -> ParseResult<()> {
+        if let (Op(popped), loc) = self.opstack.pop().ok_or_else(|| {
+            (
+                "Internal parser error: Popped from empty operator stack".to_string(),
+                self.lastloc,
+            )
+        })? {
+            self.opapply(popped, loc)
+        } else {
+            return Err((
+                "Internal parser error: non-operator on operator stack".to_string(),
+                self.lastloc,
+            ));
+        }
+    }
+
     fn oppush(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<()> {
         while !self.can_push(op, loc)? {
-            if let (Op(popped), loc) = self.oppop().ok_or_else(|| {
-                (
-                    "Internal parser error: Popped from empty operator stack".to_string(),
-                    self.lastloc,
-                )
-            })? {
-                self.opapply(popped, loc)?;
-            } else {
-                return Err((
-                    "Internal parser error: non-operator on operator stack".to_string(),
-                    self.lastloc,
-                ));
-            }
+            self.oppop()?
         }
         self.opstack.push((Op(op), loc));
         Ok(())
