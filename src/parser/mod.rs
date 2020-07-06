@@ -243,8 +243,26 @@ impl<'s> ShuntingYard<'s> {
     }
 
     fn opapply(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<()> {
-        if op.is_unary() {}
-        todo!()
+        use crate::ast::BareExp::*;
+        if op.is_unary() {
+            let arg1 = self.exppop()?;
+            let span = opthull(Some(loc.into()), arg1.1);
+            let result = ((UnOp((op, Some(loc.into())), Box::new(arg1)), None), span);
+            self.outstack.push(result)
+        } else {
+            let arg2 = self.exppop()?; // remember, the stack is back-to-front
+            let arg1 = self.exppop()?;
+            let span = opthull(arg1.1, arg2.1);
+            let result = (
+                (
+                    BinOp((op, Some(loc.into())), Box::new(arg1), Box::new(arg2)),
+                    None,
+                ),
+                span,
+            );
+            self.outstack.push(result)
+        }
+        Ok(())
     }
 
     fn oppush(&mut self, op: crate::ast::BareOp, loc: Loc) -> ParseResult<()> {
