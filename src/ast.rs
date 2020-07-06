@@ -149,13 +149,30 @@ impl BareOp {
             Geq => 60,
             Plus => 70,
             Minus => 70,
-            Neg => 75,
+            Neg => 85,
+            // Exception: since -(a*b) == (-a)*b, we choose the one that facilitates
+            // the greater amount of const folding, rather than the equivalent choice
+            // which intuition suggests.
             Mul => 80,
             Div => 80,
         }
     }
 
-    pub fn precedes(self, rhs: Self) -> bool {
-        self.prio() > rhs.prio() || (self.prio() == rhs.prio() && (self.prio() % 2 == 1))
+    pub fn is_unary(self) -> bool {
+        use BareOp::*;
+        match self {
+            Neg | Not => true,
+            _ => false,
+        }
+    }
+
+    pub fn right_precedes(self, other: Self) -> bool {
+        self.is_unary()
+            || self.prio() > other.prio()
+            || (self.prio() == other.prio() && (self.prio() % 2 == 1))
+    }
+
+    pub fn left_precedes(self, other: Self) -> bool {
+        self.prio() > other.prio() || (self.prio() == other.prio() && (self.prio() % 2 == 0))
     }
 }
