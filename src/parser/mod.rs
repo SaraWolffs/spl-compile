@@ -90,7 +90,7 @@ impl<'s> Parser<'s> {
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
-        todo!() // call shunting yard
+        ShuntingYard::new(self).run()
     }
 
     fn atom(&mut self) -> ParseResult<Exp> {
@@ -139,15 +139,6 @@ impl<'s> Parser<'s> {
     ) -> ParseResult<(Vec<T>, Span)> {
         todo!()
     }
-
-    fn shunting_yard(&mut self) -> ParseResult<Exp> {
-        // TODO: move all of this to ShuntingYard
-        let mut opstack = Vec::<tok::Token>::with_capacity(8);
-        let mut outstack = Vec::<Exp>::with_capacity(8);
-
-        assert!(outstack.len() == 1);
-        Ok(outstack.pop().unwrap())
-    }
 }
 
 #[derive(Copy, Clone, Debug, PartialEq)]
@@ -157,9 +148,9 @@ enum ShuntState {
     Done,
 }
 
-struct ShuntingYard<'s> {
+struct ShuntingYard<'s,'p> {
     state: ShuntState,
-    parser: &'s mut Parser<'s>,
+    parser: &'p mut Parser<'s>,
     opstack: Vec<tok::LocTok>, // Note: this is typed too loosely, to allow for
     // possible rewrites which have the shunting yard deal with tuples
     outstack: Vec<Exp>,
@@ -167,8 +158,8 @@ struct ShuntingYard<'s> {
     lasttok: Option<tok::Token>,
 }
 
-impl<'s> ShuntingYard<'s> {
-    fn new(parser: &'s mut Parser<'s>) -> ShuntingYard<'s> {
+impl<'s,'p> ShuntingYard<'s,'p> {
+    fn new(parser: &'p mut Parser<'s>) -> Self {
         ShuntingYard {
             state: ShuntState::Expression,
             parser: parser,
@@ -205,7 +196,7 @@ impl<'s> ShuntingYard<'s> {
     fn shunt_atom(&mut self) -> ParseResult<()> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
-        assert!(self.state == Expression);
+        assert_eq!(self.state, Expression);
         match self.parser.peektok() {
             Some(Ok((Op(Minus), loc))) => {
                 self.opstack.push((Op(Neg), *loc));
@@ -228,7 +219,7 @@ impl<'s> ShuntingYard<'s> {
     fn shunt_binop(&mut self) -> ParseResult<()> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
-        assert!(self.state == Expression);
+        assert_eq!(self.state, Operator);
         match self.parser.peektok() {
             None => {
                 self.lasttok = None;
@@ -328,8 +319,33 @@ impl<'s> ShuntingYard<'s> {
 #[cfg(test)]
 mod tests {
     use super::lex::*;
+    use super::*;
+    fn tspan(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Option<Span> {
+        Some(Span::new(startline,endline,startcol,endcol))
+    }
+
     #[test]
     fn test_sanity() {
         assert!(true);
+    }
+
+    #[test]
+    fn parse_litint_atom() {
+        use BareExp::*;
+        use LitVal::*;
+        let mut p = Parser::new("1");
+        let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 1)));
+        let test = p.atom();
+        assert_eq!(test, correct);
+    }
+
+    #[test]
+    fn parse_litint_exp() {
+        use BareExp::*;
+        use LitVal::*;
+        let mut p = Parser::new("1");
+        let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 1)));
+        let test = p.exp();
+        assert_eq!(test, correct);
     }
 }

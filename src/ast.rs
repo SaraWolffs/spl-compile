@@ -18,6 +18,14 @@ impl From<crate::parser::Loc> for Span {
 }
 
 impl Span {
+    pub(crate) fn new(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Self {
+        Self {
+            startline: startline,
+            endline: endline,
+            startcol: startcol,
+            endcol: endcol,
+        }
+    }
     pub(crate) fn hull(lhs: Self, rhs: Self) -> Self {
         use core::cmp::max;
         use core::cmp::min;
@@ -43,12 +51,14 @@ pub type Spanned<T> = (T, Option<Span>);
 pub type SPL = Vec<Decl>;
 
 pub type Decl = Spanned<BareDecl>;
+#[derive(Debug, PartialEq)]
 pub enum BareDecl {
     Var(Option<Type>, Id, Exp),
     Fun(Id, Vec<Id>, Option<FunType>, Vec<Decl>, Vec<Stmt>),
 }
 
 pub type Exp = Spanned<Typed<BareExp>>;
+#[derive(Debug, PartialEq)]
 pub enum BareExp {
     Var(Id, Vec<Selector>),
     Call(Id, Vec<Exp>),
@@ -59,6 +69,7 @@ pub enum BareExp {
 }
 
 pub type Stmt = Spanned<BareStmt>;
+#[derive(Debug, PartialEq)]
 pub enum BareStmt {
     ITE(Exp, Vec<Stmt>, Vec<Stmt>),
     While(Exp, Vec<Stmt>),
@@ -71,6 +82,7 @@ pub type FunType = Spanned<BareFunType>;
 pub type BareFunType = (Vec<Type>, Type);
 
 pub type Type = Spanned<BareType>;
+#[derive(Debug, PartialEq)]
 pub enum BareType {
     Lit(BType),
     Typename(Id),
