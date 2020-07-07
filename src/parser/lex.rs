@@ -19,6 +19,7 @@ pub(super) struct Lex<'s> {
     wordtoks: HashMap<&'s str, Token>,
     pub names: Vec<&'s str>,
     vcount: u32,
+    peeked: Option<Option<Result<LocTok, (String, Loc)>>>,
 }
 
 impl<'sub, 's: 'sub> Lex<'s> {
@@ -53,6 +54,17 @@ impl<'sub, 's: 'sub> Lex<'s> {
             wordtoks: keywords,
             names: Vec::with_capacity(128),
             vcount: 0,
+            peeked: None,
+        }
+    }
+
+    pub fn peek(&mut self) -> Option<&Result<LocTok, (String, Loc)>> {
+        if let Some(ref val) = self.peeked {
+            // Don't touch this. Borrow magic
+            val.as_ref()
+        } else {
+            self.peeked = Some(self.next());
+            self.peeked.as_ref().unwrap().as_ref()
         }
     }
 
@@ -167,6 +179,11 @@ macro_rules! fail {
 impl Iterator for Lex<'_> {
     type Item = Result<LocTok, (String, Loc)>;
     fn next(&mut self) -> Option<Self::Item> {
+        if let Some(ref val) = self.peeked {
+            let val_copy = val.to_owned();
+            self.peeked = None;
+            return val_copy;
+        }
         self.loc.advance();
         let (pos, chr) = self.step()?;
         Some(Ok(match chr {
@@ -380,5 +397,30 @@ mod tests {
         assert_eq!(toks.next(), None);
         assert_eq!(lexer.names[foo as usize], "foo");
         assert_eq!(lexer.names[(foo + 1) as usize], "b4r");
+    }
+
+    #[test]
+    fn lex_peek() {
+        let mut lexer = Lex::lex("1 2");
+        assert_eq!(
+            lexer.peek().unwrap().as_ref().unwrap().to_owned(),
+            (Token::Lit(Int(1)), tloc(0, 0, 1))
+        );
+        assert_eq!(
+            lexer.peek().unwrap().as_ref().unwrap().to_owned(),
+            (Token::Lit(Int(1)), tloc(0, 0, 1))
+        );
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            (Token::Lit(Int(1)), tloc(0, 0, 1))
+        );
+        assert_eq!(
+            lexer.peek().unwrap().as_ref().unwrap().to_owned(),
+            (Token::Lit(Int(2)), tloc(0, 2, 1))
+        );
+        assert_eq!(
+            lexer.next().unwrap().unwrap(),
+            (Token::Lit(Int(2)), tloc(0, 2, 1))
+        );
     }
 }
