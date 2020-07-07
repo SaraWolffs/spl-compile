@@ -13,11 +13,10 @@ use tok::Token::Lit as LitTok;
 use tok::Token::Selector as SelectTok;
 use tok::Token::*;
 
-type TokStream<'s> = std::iter::Peekable<lex::Lex<'s>>;
+type TokStream<'s> = lex::Lex<'s>;
 
 pub struct Parser<'s> {
     ts: TokStream<'s>,
-    lexer: lex::Lex<'s>,
 }
 
 macro_rules! unexpected {
@@ -54,6 +53,12 @@ fn hull(lhs: Span, rhs: Span) -> Span {
 }
 
 impl<'s> Parser<'s> {
+    fn new(source: &'s str) -> Self {
+        Self {
+            ts: Lex::lex(source),
+        }
+    }
+
     fn nexttok(&mut self) -> Option<<Lex as Iterator>::Item> {
         self.ts.next()
     }
