@@ -1,5 +1,4 @@
 mod lex;
-#[macro_use]
 mod tok;
 
 use crate::ast::Selector;
@@ -90,7 +89,7 @@ impl<'s> Parser<'s> {
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
-        ShuntingYard::new(self).run()
+        ShuntingYard::parse_exp(self)
     }
 
     fn atom(&mut self) -> ParseResult<Exp> {
@@ -148,7 +147,7 @@ enum ShuntState {
     Done,
 }
 
-struct ShuntingYard<'s,'p> {
+struct ShuntingYard<'s, 'p> {
     state: ShuntState,
     parser: &'p mut Parser<'s>,
     opstack: Vec<tok::LocTok>, // Note: this is typed too loosely, to allow for
@@ -158,7 +157,11 @@ struct ShuntingYard<'s,'p> {
     lasttok: Option<tok::Token>,
 }
 
-impl<'s,'p> ShuntingYard<'s,'p> {
+impl<'s, 'p> ShuntingYard<'s, 'p> {
+    pub(super) fn parse_exp(parser: &'p mut Parser<'s>) -> ParseResult<Exp> {
+        Self::new(parser).run()
+    }
+
     fn new(parser: &'p mut Parser<'s>) -> Self {
         ShuntingYard {
             state: ShuntState::Expression,
@@ -226,16 +229,14 @@ impl<'s,'p> ShuntingYard<'s,'p> {
                 self.state = Done;
             }
             Some(Err((msg, loc))) => fail!(msg, *loc),
-            Some(Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", *loc),
-            Some(Ok((Op(op), loc))) => {
-                let op_own = *op;
-                let loc_own = *loc; // for the borrow checker
-                self.oppush(op_own, loc_own)?;
+            Some(&Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", loc),
+            Some(&Ok((Op(op), loc))) => {
+                self.oppush(op, loc)?;
                 self.state = Expression;
             }
-            Some(Ok((tok, loc))) => {
-                self.lastloc = Some(*loc);
-                self.lasttok = Some(*tok);
+            Some(&Ok((tok, loc))) => {
+                self.lastloc = Some(loc);
+                self.lasttok = Some(tok);
                 self.state = Done;
             }
         }
@@ -321,7 +322,7 @@ mod tests {
     use super::lex::*;
     use super::*;
     fn tspan(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Option<Span> {
-        Some(Span::new(startline,endline,startcol,endcol))
+        Some(Span::new(startline, endline, startcol, endcol))
     }
 
     #[test]
