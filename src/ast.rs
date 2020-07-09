@@ -32,12 +32,12 @@ impl Span {
         Span {
             startline: min(lhs.startline, rhs.startline),
             endline: max(lhs.endline, rhs.endline),
-            startcol: if (lhs.startline <= rhs.startline) {
+            startcol: if lhs.startline <= rhs.startline {
                 lhs.startcol
             } else {
                 rhs.startcol
             },
-            endcol: if (lhs.endline >= rhs.endline) {
+            endcol: if lhs.endline >= rhs.endline {
                 lhs.endcol
             } else {
                 rhs.endcol

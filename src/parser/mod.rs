@@ -95,18 +95,18 @@ impl<'s> Parser<'s> {
 
     fn atom(&mut self) -> ParseResult<Exp> {
         use BareExp::*;
-        match (self.nexttok()) {
+        match self.peektok() {
             None => fail!("EOF while looking for identifier, literal, or '('"),
-            Some(Err((msg, loc))) => fail!(msg, loc),
-            Some(Ok((tok, loc))) => match tok {
+            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(&Ok((tok, loc))) => match tok {
                 IdTok(i) => self.field_or_call((i, Some(loc.into()))),
                 LitTok(val) => Ok(((Lit(val), None), Some(loc.into()))),
                 Marker(ParenOpen) => {
                     let (coords, span) = self.tuplish(Self::exp)?;
-                    if (coords.len() == 1) {
+                    if coords.len() == 1 {
                         Ok((coords.into_iter().next().unwrap().0, Some(span)))
                     } else {
-                        Ok(((Tuple(coords), None), Some(hull(loc.into(), span))))
+                        Ok(((Tuple(coords), None), Some(span)))
                     }
                 }
                 x => unexpected!(x, loc, "identifier, literal, or '('"),
@@ -116,7 +116,7 @@ impl<'s> Parser<'s> {
 
     fn field_or_call(&mut self, id: Id) -> ParseResult<Exp> {
         use BareExp::*;
-        match (self.peektok()) {
+        match self.peektok() {
             None => Ok(((Var(id, Vec::new()), None), id.1)),
             Some(Err((msg, loc))) => fail!(msg, *loc),
             Some(Ok((tok, loc))) => match tok {
@@ -137,7 +137,27 @@ impl<'s> Parser<'s> {
         &mut self,
         single: fn(&mut Self) -> ParseResult<T>,
     ) -> ParseResult<(Vec<T>, Span)> {
-        todo!()
+        let span = {
+            if let Some(Ok((Marker(ParenOpen), loc))) = self.nexttok() {
+                loc.into()
+            } else {
+                panic!("Internal parser error: called tuplish without starting '('")
+            }
+        };
+        let mut vec = Vec::new();
+        if let Some(&Ok((Marker(ParenClose), loc))) = self.peektok() {
+            return Ok((vec, hull(span, loc.into())));
+        }
+        loop {
+            vec.push(single(self)?);
+            match self.nexttok() {
+                None => fail!("EOF while parsing tuple"),
+                Some(Err((msg, loc))) => fail!(msg, loc),
+                Some(Ok((Marker(ParenClose), loc))) => break Ok((vec, hull(span, loc.into()))),
+                Some(Ok((Marker(Comma), _))) => (),
+                Some(Ok((tok, loc))) => unexpected!(tok, loc, "',' or ')'"),
+            }
+        }
     }
 }
 
