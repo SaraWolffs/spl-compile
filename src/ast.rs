@@ -29,18 +29,19 @@ impl Span {
     pub(crate) fn hull(lhs: Self, rhs: Self) -> Self {
         use core::cmp::max;
         use core::cmp::min;
+        use std::cmp::Ordering::*;
         Span {
             startline: min(lhs.startline, rhs.startline),
             endline: max(lhs.endline, rhs.endline),
-            startcol: if lhs.startline <= rhs.startline {
-                lhs.startcol
-            } else {
-                rhs.startcol
+            startcol: match lhs.startline.cmp(&rhs.startline) {
+                Less => lhs.startcol,
+                Equal => min(lhs.startcol, rhs.startcol),
+                Greater => rhs.startcol,
             },
-            endcol: if lhs.endline >= rhs.endline {
-                lhs.endcol
-            } else {
-                rhs.endcol
+            endcol: match lhs.endline.cmp(&rhs.endline) {
+                Greater => lhs.endcol,
+                Equal => max(lhs.endcol, rhs.endcol),
+                Less => rhs.endcol,
             },
         }
     }
@@ -184,6 +185,7 @@ impl BareOp {
             || (self.prio() == other.prio() && (self.prio() % 2 == 1))
     }
 
+    #[allow(dead_code)]
     pub fn left_precedes(self, other: Self) -> bool {
         self.prio() > other.prio() || (self.prio() == other.prio() && (self.prio() % 2 == 0))
     }

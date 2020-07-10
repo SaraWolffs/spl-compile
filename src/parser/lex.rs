@@ -423,4 +423,14 @@ mod tests {
             (Token::Lit(Int(2)), tloc(0, 2, 1))
         );
     }
+
+    #[test]
+    fn lex_litpluslit() {
+        use Token::Lit;
+        use Token::Op;
+        let mut l = Lex::lex("3+2");
+        assert_eq!(l.next().unwrap().unwrap(), (Lit(Int(3)), tloc(0, 0, 1)));
+        assert_eq!(l.next().unwrap().unwrap(), (Op(Plus), tloc(0, 1, 1)));
+        assert_eq!(l.next().unwrap().unwrap(), (Lit(Int(2)), tloc(0, 2, 1)));
+    }
 }

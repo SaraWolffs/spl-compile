@@ -101,6 +101,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
             Some(&Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", loc),
             Some(&Ok((Op(op), loc))) => {
                 self.oppush(op, loc)?;
+                self.parser.nexttok();
                 self.state = Expression;
             }
             Some(&Ok((tok, loc))) => {

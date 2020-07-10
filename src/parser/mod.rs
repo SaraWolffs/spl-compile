@@ -99,8 +99,14 @@ impl<'s> Parser<'s> {
             None => fail!("EOF while looking for identifier, literal, or '('"),
             Some(Err((msg, loc))) => fail!(msg, *loc),
             Some(&Ok((tok, loc))) => match tok {
-                IdTok(i) => self.field_or_call((i, Some(loc.into()))),
-                LitTok(val) => Ok(((Lit(val), None), Some(loc.into()))),
+                IdTok(i) => {
+                    self.nexttok();
+                    self.field_or_call((i, Some(loc.into())))
+                }
+                LitTok(val) => {
+                    self.nexttok();
+                    Ok(((Lit(val), None), Some(loc.into())))
+                }
                 Marker(ParenOpen) => {
                     let (coords, span) = self.tuplish(Self::exp)?;
                     if coords.len() == 1 {
@@ -119,13 +125,13 @@ impl<'s> Parser<'s> {
         match self.peektok() {
             None => Ok(((Var(id, Vec::new()), None), id.1)),
             Some(Err((msg, loc))) => fail!(msg, *loc),
-            Some(Ok((tok, loc))) => match tok {
+            Some(Ok((tok, _))) => match tok {
                 Marker(ParenOpen) => {
                     self.nexttok();
                     let (args, end) = self.tuplish(Self::exp)?;
                     Ok(((Call(id, args), None), opthull(id.1, Some(end))))
                 }
-                x => {
+                _ => {
                     let (fld, end) = self.field()?;
                     Ok(((Var(id, fld), None), opthull(id.1, Some(end))))
                 }
@@ -146,7 +152,10 @@ impl<'s> Parser<'s> {
         };
         let mut vec = Vec::new();
         if let Some(&Ok((Marker(ParenClose), loc))) = self.peektok() {
-            return Ok((vec, hull(span, loc.into())));
+            return {
+                self.nexttok();
+                Ok((vec, hull(span, loc.into())))
+            };
         }
         loop {
             vec.push(single(self)?);
@@ -192,5 +201,86 @@ mod tests {
         let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 1)));
         let test = p.exp();
         assert_eq!(test, correct);
+    }
+
+    #[test]
+    fn parse_litpluslit() {
+        use crate::ast::BareExp::*;
+        use crate::ast::BareOp::*;
+        use crate::ast::LitVal::*;
+        let mut p = Parser::new("3+2");
+        let correct = Ok((
+            (
+                BinOp(
+                    (
+                        Plus,
+                        Some(Span {
+                            startline: 0,
+                            endline: 0,
+                            startcol: 1,
+                            endcol: 2,
+                        }),
+                    ),
+                    Box::new((
+                        (Lit(Int(3)), None),
+                        Some(Span {
+                            startline: 0,
+                            endline: 0,
+                            startcol: 0,
+                            endcol: 1,
+                        }),
+                    )),
+                    Box::new((
+                        (Lit(Int(2)), None),
+                        Some(Span {
+                            startline: 0,
+                            endline: 0,
+                            startcol: 2,
+                            endcol: 3,
+                        }),
+                    )),
+                ),
+                None,
+            ),
+            Some(Span {
+                startline: 0,
+                endline: 0,
+                startcol: 0,
+                endcol: 3,
+            }),
+        ));
+        let test = p.exp();
+        assert_eq!(test, correct);
+    }
+
+    #[test]
+    fn plus_after_mul() {
+        use crate::ast::BareExp::*;
+        use crate::ast::BareOp::*;
+        use crate::ast::LitVal::*;
+        let leftplus = Parser::new("1+2*3").exp();
+        let rightplus = Parser::new("2*3+1").exp();
+        match leftplus.unwrap() {
+            ((BinOp((Plus, _), lhs, rhs), None), _) => match *rhs {
+                ((BinOp((Mul, _), rlhs, rrhs), None), _) => {
+                    assert_eq!(lhs.0, (Lit(Int(1)), None));
+                    assert_eq!(rlhs.0, (Lit(Int(2)), None));
+                    assert_eq!(rrhs.0, (Lit(Int(3)), None));
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+        match rightplus.unwrap() {
+            ((BinOp((Plus, _), lhs, rhs), None), _) => match *lhs {
+                ((BinOp((Mul, _), llhs, lrhs), None), _) => {
+                    assert_eq!(rhs.0, (Lit(Int(1)), None));
+                    assert_eq!(llhs.0, (Lit(Int(2)), None));
+                    assert_eq!(lrhs.0, (Lit(Int(3)), None));
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
     }
 }
