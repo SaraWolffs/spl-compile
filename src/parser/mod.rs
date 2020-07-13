@@ -9,6 +9,7 @@ use lex::Lex;
 
 pub use tok::Loc;
 use tok::Misc::*;
+use tok::Token;
 use tok::Token::Lit as LitTok;
 use tok::Token::Selector as SelectTok;
 use tok::Token::*;
@@ -40,6 +41,15 @@ macro_rules! fail {
     };
 }
 
+macro_rules! eof {
+    ( $expected: expr ) => {
+        return Err((format!("EOF while looking for {}", $expected), None));
+    };
+    ( :?$expected: expr ) => {
+        return Err((format!("EOF while looking for {:?}", $expected), None));
+    };
+}
+
 type ParseError = (String, Option<tok::Loc>);
 
 type ParseResult<T> = Result<T, ParseError>;
@@ -65,6 +75,13 @@ impl<'s> Parser<'s> {
 
     fn peektok(&mut self) -> Option<&<Lex as Iterator>::Item> {
         self.ts.peek()
+    }
+
+    fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
+        match self.peektok() {
+            None => eof!(:?tok),
+            _ => todo!(),
+        }
     }
 
     fn var_init(&mut self) -> ParseResult<(Id, Exp)> {
@@ -127,7 +144,6 @@ impl<'s> Parser<'s> {
             Some(Err((msg, loc))) => fail!(msg, *loc),
             Some(Ok((tok, _))) => match tok {
                 Marker(ParenOpen) => {
-                    self.nexttok();
                     let (args, end) = self.tuplish(Self::exp)?;
                     Ok(((Call(id, args), None), opthull(id.1, Some(end))))
                 }
@@ -191,6 +207,7 @@ mod tests {
         let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 1)));
         let test = p.atom();
         assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
     }
 
     #[test]
@@ -201,6 +218,7 @@ mod tests {
         let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 1)));
         let test = p.exp();
         assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
     }
 
     #[test]
@@ -212,45 +230,28 @@ mod tests {
         let correct = Ok((
             (
                 BinOp(
-                    (
-                        Plus,
-                        Some(Span {
-                            startline: 0,
-                            endline: 0,
-                            startcol: 1,
-                            endcol: 2,
-                        }),
-                    ),
-                    Box::new((
-                        (Lit(Int(3)), None),
-                        Some(Span {
-                            startline: 0,
-                            endline: 0,
-                            startcol: 0,
-                            endcol: 1,
-                        }),
-                    )),
-                    Box::new((
-                        (Lit(Int(2)), None),
-                        Some(Span {
-                            startline: 0,
-                            endline: 0,
-                            startcol: 2,
-                            endcol: 3,
-                        }),
-                    )),
+                    (Plus, tspan(0, 0, 1, 2)),
+                    Box::new(((Lit(Int(3)), None), tspan(0, 0, 0, 1))),
+                    Box::new(((Lit(Int(2)), None), tspan(0, 0, 2, 3))),
                 ),
                 None,
             ),
-            Some(Span {
-                startline: 0,
-                endline: 0,
-                startcol: 0,
-                endcol: 3,
-            }),
+            tspan(0, 0, 0, 3),
         ));
         let test = p.exp();
         assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
+    }
+
+    #[test]
+    fn paren_exp() {
+        use BareExp::*;
+        use LitVal::*;
+        let mut p = Parser::new("(1)");
+        let correct = Ok(((Lit(Int(1)), None), tspan(0, 0, 0, 3)));
+        let test = p.exp();
+        assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
     }
 
     #[test]
@@ -282,5 +283,70 @@ mod tests {
             },
             _ => unreachable!(),
         }
+    }
+
+    #[test]
+    fn arith_parens() {
+        use crate::ast::BareExp::*;
+        use crate::ast::BareOp::*;
+        use crate::ast::LitVal::*;
+        let rightplus = Parser::new("1*(2+3)").exp();
+        let leftplus = Parser::new("(2+3)*1").exp();
+        match rightplus.unwrap() {
+            ((BinOp((Mul, _), lhs, rhs), None), _) => match *rhs {
+                ((BinOp((Plus, _), rlhs, rrhs), None), _) => {
+                    assert_eq!(lhs.0, (Lit(Int(1)), None));
+                    assert_eq!(rlhs.0, (Lit(Int(2)), None));
+                    assert_eq!(rrhs.0, (Lit(Int(3)), None));
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+        match leftplus.unwrap() {
+            ((BinOp((Mul, _), lhs, rhs), None), _) => match *lhs {
+                ((BinOp((Plus, _), llhs, lrhs), None), _) => {
+                    assert_eq!(rhs.0, (Lit(Int(1)), None));
+                    assert_eq!(llhs.0, (Lit(Int(2)), None));
+                    assert_eq!(lrhs.0, (Lit(Int(3)), None));
+                }
+                _ => unreachable!(),
+            },
+            _ => unreachable!(),
+        }
+    }
+
+    #[test]
+    fn call_noargs() {
+        use crate::ast::BareExp::*;
+        let mut p = Parser::new("foo()");
+        let test = p.exp();
+        let foo = p.ts.names.iter().position(|&e| e == "foo").unwrap() as u32;
+        let correct = Ok((
+            (Call((foo, tspan(0, 0, 0, 3)), Vec::new()), None),
+            tspan(0, 0, 0, 5),
+        ));
+        assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
+    }
+
+    #[test]
+    fn tuple_newline_exp() {
+        use BareExp::*;
+        use LitVal::*;
+        let mut p = Parser::new("(1,\n2)");
+        let correct = Ok((
+            (
+                Tuple(vec![
+                    ((Lit(Int(1)), None), tspan(0, 0, 1, 2)),
+                    ((Lit(Int(2)), None), tspan(1, 1, 0, 1)),
+                ]),
+                None,
+            ),
+            tspan(0, 1, 0, 2),
+        ));
+        let test = p.exp();
+        assert_eq!(test, correct);
+        assert_eq!(p.ts.next(), None);
     }
 }
