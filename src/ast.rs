@@ -20,10 +20,10 @@ impl From<crate::parser::Loc> for Span {
 impl Span {
     pub(crate) fn new(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Self {
         Self {
-            startline: startline,
-            endline: endline,
-            startcol: startcol,
-            endcol: endcol,
+            startline,
+            endline,
+            startcol,
+            endcol,
         }
     }
     pub(crate) fn hull(lhs: Self, rhs: Self) -> Self {

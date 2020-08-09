@@ -34,7 +34,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
     fn new(parser: &'p mut Parser<'s>) -> Self {
         ShuntingYard {
             state: ShuntState::Expression,
-            parser: parser,
+            parser,
             opstack: Vec::new(),
             outstack: Vec::with_capacity(1),
             lastloc: None,
@@ -171,10 +171,10 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
         })? {
             self.opapply(popped, loc)
         } else {
-            return Err((
+            Err((
                 "Internal parser error: non-operator on operator stack".to_string(),
                 self.lastloc,
-            ));
+            ))
         }
     }
 

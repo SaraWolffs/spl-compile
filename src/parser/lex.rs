@@ -143,21 +143,18 @@ impl<'sub, 's: 'sub> Lex<'s> {
     fn rec_block_comment(&mut self) -> Option<()> {
         loop {
             match self.step_ch()? {
-                '*' => match self.ipeek() {
-                    Some('/') => {
+                '*' => {
+                    if let Some('/') = self.ipeek() {
                         self.step();
                         break Some(());
                     }
-                    _ => (),
-                },
-                '/' => match self.ipeek() {
-                    Some('*') => {
+                }
+                '/' => {
+                    if let Some('*') = self.ipeek() {
                         self.step();
                         self.rec_block_comment()?;
-                        ()
                     }
-                    _ => (),
-                },
+                }
                 '\n' => self.loc.next_line(),
                 _ => (),
             }
