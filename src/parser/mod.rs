@@ -30,6 +30,15 @@ macro_rules! unexpected {
             Some($loc),
         ));
     };
+    ( $found: expr, $loc : expr, :?$expected: expr ) => {
+        return Err((
+            format!(
+                "Unexpected {:?} encountered while looking for {:?}",
+                $found, $expected
+            ),
+            Some($loc),
+        ));
+    };
 }
 
 macro_rules! fail {
@@ -80,7 +89,15 @@ impl<'s> Parser<'s> {
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
         match self.peektok() {
             None => eof!(:?tok),
-            _ => todo!(),
+            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(&Ok((found, loc))) => {
+                if found == tok {
+                    self.nexttok();
+                    Ok((found, loc))
+                } else {
+                    unexpected!(found, loc, :?tok)
+                }
+            }
         }
     }
 
