@@ -50,12 +50,39 @@ macro_rules! fail {
     };
 }
 
+macro_rules! unexpected2 {
+    ( $loctok: expr, $expected: expr ) => {
+        fail!(
+            format!(
+                "Unexpected {:?} encountered while looking for {}",
+                $loctok[0], $expected
+            ),
+            $loctok[1]
+        )
+    };
+    ( $loctok: expr, :?$expected: expr ) => {
+        fail!(
+            format!(
+                "Unexpected {:?} encountered while looking for {:?}",
+                $loctok[0], $expected
+            ),
+            $loctok[1]
+        )
+    };
+}
+
 macro_rules! eof {
     ( $expected: expr ) => {
         return Err((format!("EOF while looking for {}", $expected), None));
     };
     ( :?$expected: expr ) => {
         return Err((format!("EOF while looking for {:?}", $expected), None));
+    };
+}
+
+macro_rules! bug {
+    ( $msg : expr ) => {
+        panic!(format!("Internal parser error: {}", $msg))
     };
 }
 
@@ -84,6 +111,19 @@ impl<'s> Parser<'s> {
 
     fn peektok(&mut self) -> Option<&<Lex as Iterator>::Item> {
         self.ts.peek()
+    }
+
+    fn trytok(&mut self) -> ParseResult<Option<tok::LocTok>> {
+        self.ts
+            .next()
+            .transpose()
+            .map_err(|(msg, loc)| (msg, Some(loc)))
+    }
+
+    fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
+        self.ts
+            .unpeek(val)
+            .map_err(|v| bug!("Attempted lookahead beyond 1"))
     }
 
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
@@ -197,7 +237,10 @@ impl<'s> Parser<'s> {
                 Some(Err((msg, loc))) => fail!(msg, loc),
                 Some(Ok((Marker(ParenClose), loc))) => break Ok((vec, hull(span, loc.into()))),
                 Some(Ok((Marker(Comma), _))) => (),
-                Some(Ok((tok, loc))) => unexpected!(tok, loc, "',' or ')'"),
+                Some(Ok((tok, loc))) => {
+                    self.unpeektok((tok, loc))?;
+                    unexpected!(tok, loc, "',' or ')'")
+                }
             }
         }
     }

@@ -68,12 +68,18 @@ impl<'sub, 's: 'sub> Lex<'s> {
         }
     }
 
-    pub fn unpeek(&mut self, val : LocTok) -> Result<(),LocTok> {
+    pub fn unpeek(&mut self, val: LocTok) -> Result<&LocTok, LocTok> {
         if self.peeked.is_none() {
             self.peeked = Some(Some(Ok(val)));
-            Ok(())
-        }
-        else {
+            Ok(self
+                .peeked
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap()
+                .as_ref()
+                .unwrap())
+        } else {
             Err(val)
         }
     }
