@@ -68,6 +68,16 @@ impl<'sub, 's: 'sub> Lex<'s> {
         }
     }
 
+    pub fn unpeek(&mut self, val : LocTok) -> Result<(),LocTok> {
+        if self.peeked.is_none() {
+            self.peeked = Some(Some(Ok(val)));
+            Ok(())
+        }
+        else {
+            Err(val)
+        }
+    }
+
     fn step(&mut self) -> Option<(usize, char)> {
         self.loc.len += 1;
         self.chars.next()
