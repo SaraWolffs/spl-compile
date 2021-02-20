@@ -1,4 +1,5 @@
 use super::*;
+use super::lex::LexError;
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
@@ -97,7 +98,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
                 self.lasttok = None;
                 self.state = Done;
             }
-            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
             Some(&Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", loc),
             Some(&Ok((Op(op), loc))) => {
                 self.oppush(op, loc)?;

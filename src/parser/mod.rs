@@ -6,6 +6,7 @@ use crate::ast::Selector;
 use crate::ast::Span;
 use crate::ast::*;
 use lex::Lex;
+use lex::LexError;
 
 pub use tok::Loc;
 use tok::Misc::*;
@@ -61,8 +62,12 @@ fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
     ))
 }
 
+fn from_lexerr(err: lex::LexError) -> ParseError {
+    (err.0, Some(err.1))
+}
+
 fn lexfail<T>(err: lex::LexError) -> ParseResult<T> {
-    Err((err.0,Some(err.1)))
+    Err(from_lexerr(err))
 }
 
 
@@ -85,7 +90,8 @@ impl<'s> Parser<'s> {
         self.ts
             .next()
             .transpose()
-            .map_err(|(msg, loc)| (msg, Some(loc)))
+            .map_err(from_lexerr)
+            //.map_err(|(msg, loc)| (msg, Some(loc)))
     }
 
     fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
@@ -94,16 +100,21 @@ impl<'s> Parser<'s> {
             .map_err(|v| ipe!("Attempted lookahead beyond 1"))
     }
 
+    fn backtrack<T>(&mut self, found: tok::LocTok, expected: String) -> ParseResult<T> {
+        self.unpeektok(found)?;
+        unexpected(found,expected)
+    }
+
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
         match self.peektok() {
-            None => eof(format!("{:?}",tok)),
-            Some(Err((msg, loc))) => fail!(msg, *loc),
+            None => eof(format!("{:?}", tok)),
+            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
             Some(&Ok((found, loc))) => {
                 if found == tok {
                     self.nexttok();
                     Ok((found, loc))
                 } else {
-                    unexpected((found, loc), format!("{:?}",tok))
+                    unexpected((found, loc), format!("{:?}", tok))
                 }
             }
         }
@@ -137,19 +148,17 @@ impl<'s> Parser<'s> {
 
     fn atom(&mut self) -> ParseResult<Exp> {
         use BareExp::*;
-        match self.peektok() {
-            None => fail!("EOF while looking for identifier, literal, or '('"),
-            Some(Err((msg, loc))) => fail!(msg, *loc),
-            Some(&Ok((tok, loc))) => match tok {
+        match self.trytok()? {
+            None => eof("identifier, literal, or '('".to_string()),
+            Some((tok, loc)) => match tok {
                 IdTok(i) => {
-                    self.nexttok();
                     self.field_or_call((i, Some(loc.into())))
                 }
                 LitTok(val) => {
-                    self.nexttok();
                     Ok(((Lit(val), None), Some(loc.into())))
                 }
                 Marker(ParenOpen) => {
+                    self.unpeektok((Marker(ParenOpen),loc))?;
                     let (coords, span) = self.tuplish(Self::exp)?;
                     if coords.len() == 1 {
                         Ok((coords.into_iter().next().unwrap().0, Some(span)))
@@ -166,7 +175,7 @@ impl<'s> Parser<'s> {
         use BareExp::*;
         match self.peektok() {
             None => Ok(((Var(id, Vec::new()), None), id.1)),
-            Some(Err((msg, loc))) => fail!(msg, *loc),
+            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
             Some(Ok((tok, _))) => match tok {
                 Marker(ParenOpen) => {
                     let (args, end) = self.tuplish(Self::exp)?;
@@ -207,7 +216,7 @@ impl<'s> Parser<'s> {
                 Some(Ok((Marker(Comma), _))) => (),
                 Some(Ok(loctok)) => {
                     self.unpeektok(loctok)?;
-                    break unexpected(loctok, "',' or ')'".to_string())
+                    break unexpected(loctok, "',' or ')'".to_string());
                 }
             }
         }

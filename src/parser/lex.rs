@@ -19,10 +19,11 @@ pub(super) struct Lex<'s> {
     wordtoks: HashMap<&'s str, Token>,
     pub names: Vec<&'s str>,
     vcount: u32,
-    peeked: Option<Option<Result<LocTok, (String, Loc)>>>,
+    peeked: Option<Option<Result<LocTok, LexError>>>,
 }
 
-pub(super) type LexError = (String, Loc);
+#[derive(Clone,PartialEq,Eq,Debug)]
+pub(super) struct LexError(pub String, pub Loc);
 
 impl<'sub, 's: 'sub> Lex<'s> {
     pub fn lex(source: &'s str) -> Lex<'s> {
@@ -60,7 +61,7 @@ impl<'sub, 's: 'sub> Lex<'s> {
         }
     }
 
-    pub fn peek(&mut self) -> Option<&Result<LocTok, (String, Loc)>> {
+    pub fn peek(&mut self) -> Option<&Result<LocTok, LexError>> {
         if let Some(ref val) = self.peeked {
             // Don't touch this. Borrow magic
             val.as_ref()
@@ -187,12 +188,12 @@ impl<'sub, 's: 'sub> Lex<'s> {
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Some(Err(($reason.to_string(), $loc)));
+        return Some(Err(LexError($reason.to_string(), $loc)));
     };
 }
 
 impl Iterator for Lex<'_> {
-    type Item = Result<LocTok, (String, Loc)>;
+    type Item = Result<LocTok, LexError>;
     fn next(&mut self) -> Option<Self::Item> {
         if let Some(ref val) = self.peeked {
             let val_copy = val.to_owned();
@@ -361,7 +362,7 @@ mod tests {
         let mut toks = Lex::lex("/");
         assert_eq!(
             toks.next().unwrap(),
-            Err(("Found lone /".to_string(), tloc(0, 0, 1)))
+            Err(LexError("Found lone /".to_string(), tloc(0, 0, 1)))
         );
     }
 

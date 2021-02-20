@@ -1,6 +1,6 @@
 use crate::ast::{BType, BareId, BareOp, BareSelector, LitVal};
 
-#[derive(Copy, Clone, Debug, PartialEq)]
+#[derive(Copy, Clone, Debug, PartialEq,Eq)]
 pub struct Loc {
     pub line: u32,
     pub col: u16,
