@@ -1,12 +1,12 @@
-use super::*;
 use super::lex::LexError;
+use super::*;
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Err(($reason.to_string(), Some($loc)));
+        return Err(ParseError($reason.to_string(), Some($loc)));
     };
     ( $reason : expr ) => {
-        return Err(($reason.to_string(), None));
+        return Err(ParseError($reason.to_string(), None));
     };
 }
 
@@ -116,7 +116,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
 
     fn exppop(&mut self) -> ParseResult<Exp> {
         self.outstack.pop().ok_or_else(|| {
-            (
+            ParseError(
                 "Internal parser error: Popped from empty expression stack".to_string(),
                 self.lastloc,
             )
@@ -132,7 +132,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
             None => true,
             Some((Op(stacked), _)) => op.right_precedes(stacked),
             _ => {
-                return Err((
+                return Err(ParseError(
                     "Internal parser error: non-operator on operator stack".to_string(),
                     self.lastloc.or(Some(loc)),
                 ))
@@ -165,14 +165,14 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
 
     fn oppop(&mut self) -> ParseResult<()> {
         if let (Op(popped), loc) = self.opstack.pop().ok_or_else(|| {
-            (
+            ParseError(
                 "Internal parser error: Popped from empty operator stack".to_string(),
                 self.lastloc,
             )
         })? {
             self.opapply(popped, loc)
         } else {
-            Err((
+            Err(ParseError(
                 "Internal parser error: non-operator on operator stack".to_string(),
                 self.lastloc,
             ))

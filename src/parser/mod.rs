@@ -23,10 +23,10 @@ pub struct Parser<'s> {
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Err(($reason.to_string(), Some($loc)));
+        return Err(ParseError($reason.to_string(), Some($loc)));
     };
     ( $reason : expr ) => {
-        return Err(($reason.to_string(), None));
+        return Err(ParseError($reason.to_string(), None));
     };
 }
 
@@ -36,7 +36,8 @@ macro_rules! ipe {
     };
 }
 
-type ParseError = (String, Option<tok::Loc>);
+#[derive(PartialEq,Eq,Debug,Clone)]
+struct ParseError(String, Option<tok::Loc>);
 
 type ParseResult<T> = Result<T, ParseError>;
 
@@ -49,11 +50,11 @@ fn hull(lhs: Span, rhs: Span) -> Span {
 }
 
 fn eof<T>(expected: String) -> ParseResult<T> {
-    Err((format!("EOF while looking for {}", expected), None))
+    Err(ParseError(format!("EOF while looking for {}", expected), None))
 }
 
 fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
-    Err((
+    Err(ParseError(
         format!(
             "Unexpected {:?} encountered while looking for {}",
             found.0, expected
@@ -63,13 +64,12 @@ fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
 }
 
 fn from_lexerr(err: lex::LexError) -> ParseError {
-    (err.0, Some(err.1))
+    ParseError(err.0, Some(err.1))
 }
 
 fn lexfail<T>(err: lex::LexError) -> ParseResult<T> {
     Err(from_lexerr(err))
 }
-
 
 impl<'s> Parser<'s> {
     fn new(source: &'s str) -> Self {
@@ -87,11 +87,8 @@ impl<'s> Parser<'s> {
     }
 
     fn trytok(&mut self) -> ParseResult<Option<tok::LocTok>> {
-        self.ts
-            .next()
-            .transpose()
-            .map_err(from_lexerr)
-            //.map_err(|(msg, loc)| (msg, Some(loc)))
+        self.ts.next().transpose().map_err(from_lexerr)
+        //.map_err(|(msg, loc)| (msg, Some(loc)))
     }
 
     fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
@@ -102,7 +99,7 @@ impl<'s> Parser<'s> {
 
     fn backtrack<T>(&mut self, found: tok::LocTok, expected: String) -> ParseResult<T> {
         self.unpeektok(found)?;
-        unexpected(found,expected)
+        unexpected(found, expected)
     }
 
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
@@ -151,14 +148,10 @@ impl<'s> Parser<'s> {
         match self.trytok()? {
             None => eof("identifier, literal, or '('".to_string()),
             Some((tok, loc)) => match tok {
-                IdTok(i) => {
-                    self.field_or_call((i, Some(loc.into())))
-                }
-                LitTok(val) => {
-                    Ok(((Lit(val), None), Some(loc.into())))
-                }
+                IdTok(i) => self.field_or_call((i, Some(loc.into()))),
+                LitTok(val) => Ok(((Lit(val), None), Some(loc.into()))),
                 Marker(ParenOpen) => {
-                    self.unpeektok((Marker(ParenOpen),loc))?;
+                    self.unpeektok((Marker(ParenOpen), loc))?;
                     let (coords, span) = self.tuplish(Self::exp)?;
                     if coords.len() == 1 {
                         Ok((coords.into_iter().next().unwrap().0, Some(span)))
