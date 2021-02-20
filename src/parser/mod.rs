@@ -20,27 +20,6 @@ pub struct Parser<'s> {
     ts: TokStream<'s>,
 }
 
-macro_rules! unexpected {
-    ( $found: expr, $loc : expr, $expected: expr ) => {
-        return Err((
-            format!(
-                "Unexpected {:?} encountered while looking for {}",
-                $found, $expected
-            ),
-            Some($loc),
-        ));
-    };
-    ( $found: expr, $loc : expr, :?$expected: expr ) => {
-        return Err((
-            format!(
-                "Unexpected {:?} encountered while looking for {:?}",
-                $found, $expected
-            ),
-            Some($loc),
-        ));
-    };
-}
-
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
         return Err(($reason.to_string(), Some($loc)));
@@ -50,37 +29,7 @@ macro_rules! fail {
     };
 }
 
-macro_rules! unexpected2 {
-    ( $loctok: expr, $expected: expr ) => {
-        fail!(
-            format!(
-                "Unexpected {:?} encountered while looking for {}",
-                $loctok[0], $expected
-            ),
-            $loctok[1]
-        )
-    };
-    ( $loctok: expr, :?$expected: expr ) => {
-        fail!(
-            format!(
-                "Unexpected {:?} encountered while looking for {:?}",
-                $loctok[0], $expected
-            ),
-            $loctok[1]
-        )
-    };
-}
-
-macro_rules! eof {
-    ( $expected: expr ) => {
-        return Err((format!("EOF while looking for {}", $expected), None));
-    };
-    ( :?$expected: expr ) => {
-        return Err((format!("EOF while looking for {:?}", $expected), None));
-    };
-}
-
-macro_rules! bug {
+macro_rules! ipe {
     ( $msg : expr ) => {
         panic!(format!("Internal parser error: {}", $msg))
     };
@@ -97,6 +46,25 @@ fn opthull(lhs: Option<Span>, rhs: Option<Span>) -> Option<Span> {
 fn hull(lhs: Span, rhs: Span) -> Span {
     Span::hull(lhs, rhs)
 }
+
+fn eof<T>(expected: String) -> ParseResult<T> {
+    Err((format!("EOF while looking for {}", expected), None))
+}
+
+fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
+    Err((
+        format!(
+            "Unexpected {:?} encountered while looking for {}",
+            found.0, expected
+        ),
+        Some(found.1),
+    ))
+}
+
+fn lexfail<T>(err: lex::LexError) -> ParseResult<T> {
+    Err((err.0,Some(err.1)))
+}
+
 
 impl<'s> Parser<'s> {
     fn new(source: &'s str) -> Self {
@@ -123,19 +91,19 @@ impl<'s> Parser<'s> {
     fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
         self.ts
             .unpeek(val)
-            .map_err(|v| bug!("Attempted lookahead beyond 1"))
+            .map_err(|v| ipe!("Attempted lookahead beyond 1"))
     }
 
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
         match self.peektok() {
-            None => eof!(:?tok),
+            None => eof(format!("{:?}",tok)),
             Some(Err((msg, loc))) => fail!(msg, *loc),
             Some(&Ok((found, loc))) => {
                 if found == tok {
                     self.nexttok();
                     Ok((found, loc))
                 } else {
-                    unexpected!(found, loc, :?tok)
+                    unexpected((found, loc), format!("{:?}",tok))
                 }
             }
         }
@@ -189,7 +157,7 @@ impl<'s> Parser<'s> {
                         Ok(((Tuple(coords), None), Some(span)))
                     }
                 }
-                x => unexpected!(x, loc, "identifier, literal, or '('"),
+                x => unexpected((x, loc), "identifier, literal, or '('".to_string()),
             },
         }
     }
@@ -234,12 +202,12 @@ impl<'s> Parser<'s> {
             vec.push(single(self)?);
             match self.nexttok() {
                 None => fail!("EOF while parsing tuple"),
-                Some(Err((msg, loc))) => fail!(msg, loc),
+                Some(Err(e)) => break lexfail(e),
                 Some(Ok((Marker(ParenClose), loc))) => break Ok((vec, hull(span, loc.into()))),
                 Some(Ok((Marker(Comma), _))) => (),
-                Some(Ok((tok, loc))) => {
-                    self.unpeektok((tok, loc))?;
-                    unexpected!(tok, loc, "',' or ')'")
+                Some(Ok(loctok)) => {
+                    self.unpeektok(loctok)?;
+                    break unexpected(loctok, "',' or ')'".to_string())
                 }
             }
         }

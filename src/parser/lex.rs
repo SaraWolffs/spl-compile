@@ -22,6 +22,8 @@ pub(super) struct Lex<'s> {
     peeked: Option<Option<Result<LocTok, (String, Loc)>>>,
 }
 
+pub(super) type LexError = (String, Loc);
+
 impl<'sub, 's: 'sub> Lex<'s> {
     pub fn lex(source: &'s str) -> Lex<'s> {
         // TODO: remove loc.len+=, use loc.step()
