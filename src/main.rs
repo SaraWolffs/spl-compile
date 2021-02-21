@@ -1,3 +1,4 @@
+#![allow(dead_code)]
 use ast::*;
 use regex::Regex;
 use std::mem::size_of;

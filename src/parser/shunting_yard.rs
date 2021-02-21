@@ -1,4 +1,3 @@
-use super::lex::LexError;
 use super::*;
 
 macro_rules! fail {
@@ -70,14 +69,14 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert_eq!(self.state, Expression);
-        match self.parser.peektok() {
-            Some(Ok((Op(Minus), loc))) => {
-                self.opstack.push((Op(Neg), *loc));
+        match self.parser.peektok()? {
+            Some(&(Op(Minus), loc)) => {
+                self.opstack.push((Op(Neg), loc));
                 self.parser.nexttok();
                 self.state = Expression;
             }
-            Some(Ok((Op(Not), loc))) => {
-                self.opstack.push((Op(Not), *loc));
+            Some(&(Op(Not), loc)) => {
+                self.opstack.push((Op(Not), loc));
                 self.parser.nexttok();
                 self.state = Expression;
             }
@@ -93,19 +92,18 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert_eq!(self.state, Operator);
-        match self.parser.peektok() {
+        match self.parser.peektok()? {
             None => {
                 self.lasttok = None;
                 self.state = Done;
             }
-            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
-            Some(&Ok((Op(Not), loc))) => fail!("Expected binary operator, found '!'", loc),
-            Some(&Ok((Op(op), loc))) => {
+            Some(&(Op(Not), loc)) => fail!("Expected binary operator, found '!'", loc),
+            Some(&(Op(op), loc)) => {
                 self.oppush(op, loc)?;
                 self.parser.nexttok();
                 self.state = Expression;
             }
-            Some(&Ok((tok, loc))) => {
+            Some(&(tok, loc)) => {
                 self.lastloc = Some(loc);
                 self.lasttok = Some(tok);
                 self.state = Done;

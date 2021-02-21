@@ -39,8 +39,8 @@ macro_rules! ipe {
 #[derive(PartialEq, Eq, Debug, Clone)]
 struct ParseError(String, Option<tok::Loc>);
 
-impl From<lex::LexError> for ParseError {
-    fn from(err: lex::LexError) -> Self {
+impl From<LexError> for ParseError {
+    fn from(err: LexError) -> Self {
         ParseError(err.0, Some(err.1))
     }
 }
@@ -72,7 +72,7 @@ fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
     ))
 }
 
-fn lexfail<T>(err: lex::LexError) -> ParseResult<T> {
+fn lexfail<T>(err: LexError) -> ParseResult<T> {
     Err(ParseError::from(err))
 }
 
@@ -87,8 +87,12 @@ impl<'s> Parser<'s> {
         self.ts.next()
     }
 
-    fn peektok(&mut self) -> Option<&<Lex as Iterator>::Item> {
-        self.ts.peek()
+    fn peektok(&mut self) -> ParseResult<Option<&tok::LocTok>> {
+        match self.ts.peek() {
+            None => Ok(None),
+            Some(Err(e)) => lexfail(e.to_owned()),
+            Some(Ok(ref loctok)) => Ok(Some(loctok)),
+        }
     }
 
     fn trytok(&mut self) -> ParseResult<Option<tok::LocTok>> {
@@ -99,7 +103,7 @@ impl<'s> Parser<'s> {
     fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
         self.ts
             .unpeek(val)
-            .map_err(|v| ipe!("Attempted lookahead beyond 1"))
+            .map_err(|_| ipe!("Attempted lookahead beyond 1"))
     }
 
     fn backtrack<T>(&mut self, found: tok::LocTok, expected: String) -> ParseResult<T> {
@@ -108,10 +112,9 @@ impl<'s> Parser<'s> {
     }
 
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
-        match self.peektok() {
+        match self.peektok()? {
             None => eof(format!("{:?}", tok)),
-            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
-            Some(&Ok((found, loc))) => {
+            Some(&(found, loc)) => {
                 if found == tok {
                     self.nexttok();
                     Ok((found, loc))
@@ -224,10 +227,9 @@ impl<'s> Parser<'s> {
 
     fn field_or_call(&mut self, id: Id) -> ParseResult<Exp> {
         use BareExp::*;
-        match self.peektok() {
+        match self.peektok()? {
             None => Ok(((Var(id, Vec::new()), None), id.1)),
-            Some(Err(LexError(msg, loc))) => fail!(msg, *loc),
-            Some(Ok((tok, _))) => match tok {
+            Some((tok, _)) => match tok {
                 Marker(ParenOpen) => {
                     let (args, end) = self.tuplish(Self::exp)?;
                     Ok(((Call(id, args), None), opthull(id.1, Some(end))))
@@ -252,7 +254,7 @@ impl<'s> Parser<'s> {
             }
         };
         let mut vec = Vec::new();
-        if let Some(&Ok((Marker(ParenClose), loc))) = self.peektok() {
+        if let Some(&(Marker(ParenClose), loc)) = self.peektok()? {
             return {
                 self.nexttok();
                 Ok((vec, hull(span, loc.into())))

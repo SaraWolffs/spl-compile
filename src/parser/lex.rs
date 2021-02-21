@@ -1,4 +1,3 @@
-use crate::ast::{BType, BareOp, BareSelector, LitVal};
 use std::collections::HashMap;
 use std::iter::Peekable;
 use std::num::ParseIntError;
