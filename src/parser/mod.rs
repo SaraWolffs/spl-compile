@@ -36,8 +36,14 @@ macro_rules! ipe {
     };
 }
 
-#[derive(PartialEq,Eq,Debug,Clone)]
+#[derive(PartialEq, Eq, Debug, Clone)]
 struct ParseError(String, Option<tok::Loc>);
+
+impl From<lex::LexError> for ParseError {
+    fn from(err: lex::LexError) -> Self {
+        ParseError(err.0, Some(err.1))
+    }
+}
 
 type ParseResult<T> = Result<T, ParseError>;
 
@@ -50,7 +56,10 @@ fn hull(lhs: Span, rhs: Span) -> Span {
 }
 
 fn eof<T>(expected: String) -> ParseResult<T> {
-    Err(ParseError(format!("EOF while looking for {}", expected), None))
+    Err(ParseError(
+        format!("EOF while looking for {}", expected),
+        None,
+    ))
 }
 
 fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
@@ -63,12 +72,8 @@ fn unexpected<T>(found: tok::LocTok, expected: String) -> ParseResult<T> {
     ))
 }
 
-fn from_lexerr(err: lex::LexError) -> ParseError {
-    ParseError(err.0, Some(err.1))
-}
-
 fn lexfail<T>(err: lex::LexError) -> ParseResult<T> {
-    Err(from_lexerr(err))
+    Err(ParseError::from(err))
 }
 
 impl<'s> Parser<'s> {
@@ -87,7 +92,7 @@ impl<'s> Parser<'s> {
     }
 
     fn trytok(&mut self) -> ParseResult<Option<tok::LocTok>> {
-        self.ts.next().transpose().map_err(from_lexerr)
+        self.ts.next().transpose().map_err(ParseError::from)
         //.map_err(|(msg, loc)| (msg, Some(loc)))
     }
 
@@ -117,14 +122,13 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn var_init(&mut self) -> ParseResult<(Id, Exp)> {
+    fn decl(&mut self) -> ParseResult<Decl> {
         todo!();
     }
 
-    fn non_id_type(&mut self) -> ParseResult<Type> {
+    fn fun_or_named_type_var_decl(&mut self, id: Id) -> ParseResult<Decl> {
         todo!();
     }
-
     /*
     fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
         match ts.next(){
@@ -134,6 +138,60 @@ impl<'s> Parser<'s> {
         }
     }
     */
+
+    fn var_init(&mut self) -> ParseResult<(Id, Exp)> {
+        todo!();
+    }
+
+    fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
+        todo!();
+    }
+
+    // FIXME: should probably rework this to just be included in stmt, VarDecls aren't special
+    // enough to keep separate.
+    fn f_stmt(&mut self) -> ParseResult<FStmt> {
+        todo!();
+    }
+
+    fn stmt_or_var_decl(&mut self, id: Id) -> ParseResult<FStmt> {
+        todo!();
+    }
+
+    fn ret_type(&mut self) -> ParseResult<Type> {
+        todo!();
+    }
+
+    fn fun_type(&mut self) -> ParseResult<FunType> {
+        todo!();
+    }
+
+    fn typ(&mut self) -> ParseResult<Type> {
+        todo!();
+    }
+
+    fn non_id_type(&mut self) -> ParseResult<Type> {
+        todo!();
+    }
+
+    fn b_type(&mut self) -> ParseResult<BType> {
+        todo!();
+    }
+
+    fn stmt(&mut self) -> ParseResult<Stmt> {
+        todo!();
+    }
+
+    fn assign_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
+        todo!();
+    }
+
+    fn compound(&mut self) -> ParseResult<Vec<Stmt>> {
+        todo!();
+    }
+
+    fn selector(&mut self) -> ParseResult<Selector> {
+        todo!();
+    }
 
     fn field(&mut self) -> ParseResult<(Vec<Selector>, Span)> {
         todo!()

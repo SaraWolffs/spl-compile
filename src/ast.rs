@@ -58,6 +58,14 @@ pub enum BareDecl {
     Fun(Id, Vec<Id>, Option<FunType>, Vec<Decl>, Vec<Stmt>),
 }
 
+// FIXME: should probably rework this to just be included in Stmt, VarDecls aren't special
+// enough to keep separate.
+#[derive(Debug, PartialEq)]
+pub enum FStmt {
+    DeclStmt(Decl),
+    PureStmt(Stmt),
+}
+
 pub type Exp = Spanned<Typed<BareExp>>;
 #[derive(Debug, PartialEq)]
 pub enum BareExp {

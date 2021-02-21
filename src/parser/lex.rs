@@ -22,7 +22,7 @@ pub(super) struct Lex<'s> {
     peeked: Option<Option<Result<LocTok, LexError>>>,
 }
 
-#[derive(Clone,PartialEq,Eq,Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub(super) struct LexError(pub String, pub Loc);
 
 impl<'sub, 's: 'sub> Lex<'s> {

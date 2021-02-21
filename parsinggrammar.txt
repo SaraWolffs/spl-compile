@@ -4,10 +4,10 @@ Decl =
   | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
   | id FunOrNamedTypeVarDecl
 FunOrNamedTypeVarDecl = 
-   FunSig                     {peek in {'('}} 
+   FunDef                     {peek in {'('}}
  | VarInit                    {peek in {id} }
 VarInit = id '=' Exp ';'
-FunSig = Tuplish_id [ '::' FunType ] '{' FStmt* '}'
+FunDef = Tuplish_id [ '::' FunType ] '{' FStmt* '}'
 FStmt = 
     'var' VarInit
   | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
@@ -16,15 +16,15 @@ FStmt =
 StmtOrVarDecl = 
    AssignOrCall               {peek in {'.','=','('}}
  | VarInit                    {peek in {id} }
-RetType = Type 
-FunType = Type* '->' RetType
-Type = NonIdType              {peek in {'Int','Bool','Char','(','['}}
-     | id 
-NonIdType = BType | Tuplish_Type | '[' Type ']'
+RetType = Typ
+FunType = Typ* '->' RetType
+Typ  = NonIdType              {peek in {'Int','Bool','Char','(','['}}
+     | id
+NonIdType = BType | Tuplish_Type | '[' Typ ']'
 BType = 'Int' | 'Bool' | 'Char' | 'Void'
 Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
  | 'while '(' Exp ')' Compound
- | id AssignOrCall 
+ | id AssignOrCall
  | 'return' [ Exp ] ';'
 AssignOrCall = 
    Field '=' Exp ';'           {peek in {'.','='}}
