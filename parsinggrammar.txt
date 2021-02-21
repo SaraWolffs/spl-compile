@@ -74,7 +74,7 @@ keys:
 '=': '=='
 '[': '[]'
 ':': '::'
-'-': '->' (int)
+'-': '->'
 '*': '*/'
 '//' '/*' // Special case: strip in preprocessing
 
@@ -83,6 +83,8 @@ keys:
 
 // On top of the below (from grammar.txt), extensive left-factoring, and removal
 // of rules so made redundant.
+// Fused FStmt to decrease lookahead (unfuse in semantic analysis)
+// Removed negative integer constants, fix in constant folding.
 
 // Op2 = '+' | '-' | '*' | '%'
    | '==' | '<' | '>' | '<=' | '>=' | '!='

@@ -8,6 +8,8 @@ use crate::ast::*;
 use lex::Lex;
 use lex::LexError;
 
+use crate::ast::BareDecl::Var as DVar;
+use crate::ast::BareExp::Var as EVar;
 pub use tok::Loc;
 use tok::Misc::*;
 use tok::Token;
@@ -125,8 +127,32 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn decl(&mut self) -> ParseResult<Decl> {
-        todo!();
+    fn decl(&mut self) -> ParseResult<Option<Decl>> {
+        match self.trytok()? {
+            None => Ok(None),
+            Some((Marker(Var), loc)) => {
+                let (id, exp, loc2) = self.var_init()?;
+                Ok(Some((
+                    DVar(None, id, exp),
+                    Some(hull(Span::from(loc), Span::from(loc2))),
+                )))
+            }
+            Some((IdTok(id), loc)) => Ok(Some(
+                self.fun_or_named_type_var_decl((id, Some(Span::from(loc))))?,
+            )),
+            Some((nonid, loc)) => match nonid {
+                TypeTok(_) | Marker(ParenOpen) | Marker(BrackOpen) => {
+                    self.unpeektok((nonid, loc))?;
+                    let typ = self.non_id_type()?;
+                    let (id, exp, loc2) = self.var_init()?;
+                    Ok(Some((
+                        DVar(Some(typ), id, exp),
+                        Some(hull(Span::from(loc), Span::from(loc2))),
+                    )))
+                }
+                _ => self.backtrack((nonid, loc), "type or identifier".to_string()),
+            },
+        }
     }
 
     fn fun_or_named_type_var_decl(&mut self, id: Id) -> ParseResult<Decl> {
@@ -142,7 +168,7 @@ impl<'s> Parser<'s> {
     }
     */
 
-    fn var_init(&mut self) -> ParseResult<(Id, Exp)> {
+    fn var_init(&mut self) -> ParseResult<(Id, Exp, Loc)> {
         todo!();
     }
 
@@ -150,7 +176,7 @@ impl<'s> Parser<'s> {
         todo!();
     }
 
-    // FIXME: should probably rework this to just be included in stmt, VarDecls aren't special
+    // Might want to rework this to just be included in stmt, VarDecls aren't special
     // enough to keep separate.
     fn f_stmt(&mut self) -> ParseResult<FStmt> {
         todo!();

@@ -1,4 +1,5 @@
 #![allow(dead_code)]
+#![deny(unused_must_use)]
 use ast::*;
 use regex::Regex;
 use std::mem::size_of;
