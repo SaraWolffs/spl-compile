@@ -60,7 +60,7 @@ Op1 = '!' | '-'
 Arith_0 = Atom
 
 /***************   TOKENS    ****************/
-int = [ '-' ] digit+
+int = digit+
 id = alpha ( '_' | alphanumeric )*
 char = "'" any
 keys:
