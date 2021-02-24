@@ -1,7 +1,7 @@
 SPL = Decl+
 Decl = VarDecl | FunDecl
 VarDecl = ('var' | Type) id '=' Exp ';'
-FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] '{' VarDecl* Stmt+ '}'
+FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] Compound
 RetType = Type | 'Void'
 FunType = Type* '->' RetType
 Type = BType | '(' Type ',' Type ')' | '[' Type ']' | id
@@ -12,6 +12,7 @@ Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
      | qualid '=' Exp ';'
      | FunCall ';'
      | 'return' [ Exp ] ';'
+     | VarDecl
 Compound = '{' Stmt* '}'
 Selector = 'hd' | 'tl' | 'fst' | 'snd'
 qualid = id ('.' Selector)*
@@ -76,3 +77,7 @@ keys:
 // FunType = [ FTypes ] '->' RetType // regularized and inlined
 // FTypes = Type [ FTypes ] // replaced by Type* in FunType
 // FArgs = (id ',') FArgs // removed left recursion, then regularized.
+// Added VarDecl to Stmt to simplify function bodies
+// Made empty function bodies legal (meaning "Void noop"), making them coincide
+// compound statements, resulting in
+// FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] Compound

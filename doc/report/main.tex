@@ -1,0 +1,352 @@
+\documentclass{report}
+
+\usepackage[a4paper]{geometry}
+\usepackage{hyperref}
+\usepackage{xcolor}
+\usepackage{listings}
+\lstdefinelanguage{SPL}{%
+	alsoletter={0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz_+-*/\%=<>!\&|}
+	morekeywords={while,else,if,print,return,isEmpty,fst,snd,hd,tl,Int,Char,Bool,Void,True,False,var},%
+	sensitive=true,%
+	morecomment=[l]{//},%
+	morecomment=[n]{/*}{*/},%
+	literate=%
+		{->}{{$\rightarrow$}}2
+		{>=}{{$\geq\:$}}1
+		{<=}{{$\leq\:$}}1
+		{==}{{$\equiv$}}1
+}
+\lstset{%
+	upquote=true,
+	breakatwhitespace=false,
+	breaklines=true,
+	postbreak=\mbox{\textcolor{gray}{$\hookrightarrow$}\space},
+	keepspaces=true,
+	basicstyle=\tt\footnotesize,
+	commentstyle=\sl,
+	keywordstyle=\bf,
+	stringstyle=\tt,
+	showspaces=false,
+	showstringspaces=false,
+	showtabs=false,
+	tabsize=4,
+	basewidth=0.43em,
+	columns=[c]fixed,
+	texcl=true,
+	captionpos=b
+}
+
+\author{%
+	Sal Wolffs\\
+	\small\texttt{s4064542}
+}
+\date{\today}
+\title{SPL-Compile}
+
+\begin{document}
+
+\maketitle%
+
+\tableofcontents%
+
+\chapter{Introduction}
+\begin{quote}
+	\it
+    Prediction is very difficult, especially if it's about the future!
+\end{quote}
+\section{Language: Rust}
+For this project, the Rust language was chosen, which offers a nice balance of
+speed, abstraction, safety, functional amenities and imperative control. It's
+also a very young language with serious development effort behind it, so it
+combines a lot of the niceties language designers explored over the past
+decades.
+
+\section{SPL}
+SPL is a simple C-like language targeting a didactic stack machine. It borrows
+some syntax ideas from the Miranda family (e.g. Haskell), but is imperative at
+its core. Those familiar with the C family will easily read it as a limited
+subset with a few added features. In this project, we will first implement it,
+and then try to extend it into something more expressive.
+%\begin{itemize}
+%	\item Motivate your language choice
+%	\item Introduce spl
+%	\item Give some nice examples.
+%	\item \ldots
+%\end{itemize}
+
+\chapter{Lexing \& Parsing}
+\section{Grammar}
+To facilitate parsing the language, we made some adjustments to the grammar,
+ending up with two versions: one human-friendly ``semantic'' grammar, which
+stays close to the specifications given, and one heavily refactored ``parsing''
+grammar, which is LL(1) but somewhat hard to recognize as SPL. They are intended
+to accept the same language, however, just specified differently for different
+purposes.
+
+TODO: rework these notes from the grammar into a pretty list of grammar
+adjustments. 
+\begin{verbatim}
+// Fused FStmt to decrease lookahead (unfuse in semantic analysis)
+// Removed negative integer constants, fix in constant folding.
+// On top of the below (from grammar.txt), extensive left-factoring, and removal
+// of rules so made redundant.
+
+// Op2 = '+' | '-' | '*' | '%'
+   | '==' | '<' | '>' | '<=' | '>=' | '!='
+   | '&&' | '||'
+   | ':' // Replaced by Opl_n, Opr_n, and Op1_n
+// ActArgs = Exp [ ',' ActArgs ] // regularized
+// Exp = ... // Completely rewritten as Arith_n and Atom
+// qualid = id ('.' Selector)* // added, factored out of Stmt, Atom.
+// Field = [ Field ( '.' 'hd' | '.' 'tl' | '.' 'fst' | '.' 'snd' ) ] 
+// left factored, regularized, factored out Selector, inlined.
+// Selector = 'hd' | 'tl' | 'fst' | 'snd' // Added
+// Compound = '{' Stmt* '}' // added, factored out of Stmt
+// FunType = [ FTypes ] '->' RetType // regularized and inlined
+// FTypes = Type [ FTypes ] // replaced by Type* in FunType
+// FArgs = (id ',') FArgs // removed left recursion, then regularized.
+
+/***************   ERRATA   ****************/
+int = digit+
+// greedy lexing would incorrectly lex 5-6 as two ints otherwise. The parser can
+// undo this in the expression parser.
+\end{verbatim}
+
+In general, there is a tendency to simplify the grammar by accepting more, and
+delegating hard problems to later stages.
+
+\section{Lexer}
+We did decide to use a separate lexer, which mainly performs a massive
+\texttt{match} and then goes into specialized functions for more complicated
+tokens (identifiers, integers) and comments. Using a specialized function also
+allows dealing with nested comments. Comments are entirely dropped, and strings
+are interned as part of lexing, with the store as a public field of the lexer
+for later use. Doing interning in the lexer also allows the lexer to do keyword
+recognition by preloading keywords into the interner during initialization.
+
+The lexed tokens are made available by making the lexer a Rust Iterator, which
+means that repeated calls to \texttt{lexerinstance.next()} yield successive tokens.
+
+Because the parser will want to do 1 token lookahead, we added a
+\texttt{.peek()} method to the lexer which gives the next token without
+consuming it.
+
+\section{AST\&Parser}
+The parser is a manual predictive recursive descent parser with a single token
+lookahead. This means that it can only parse an LL(1) grammar, but in return it
+never needs to backtrack, yielding linear parse times. The parser's essential
+call structure, excluding generic helper functions, is a carbon copy of the
+parsing grammar, while the produced AST is a datatype whose structure is almost
+a straight copy of the semantic grammar, the difference being the addition of
+location annotation and space for adding type information during semantic
+analysis.
+
+There is one issue with limiting ourselves to LL(1) grammars, which is that
+expressions cannot be unambiguously parsed with correct precedence as an LL(1)
+grammar. To get around this, we use a specialized shunting yard parser, which is
+pretty much textbook except for the point where it doesn't deal with
+parentheses or calls, rather calling back into the main parser to parse those
+and then dealing with the result as atoms. The shunting yard uses numerical
+precedence, and the number range is stretched to allow future (or
+user-specified) insertions, which has the side effect of letting us encode
+left/right associativity in the parity of the precedence (so even is left
+associative, odd is right), which has the nice side effect of avoiding
+equal-precedence differing-fixity operators leaving room for ambiguous parses.
+
+Errors are handled differently according to nature: if the error is a compiler
+bug, it panics, terminating compilation with a backtrace to debug the compiler
+itself with. If the error is a syntax error in the input, return an error value
+to the user with a reason and location. Currently, no errors are accumulated,
+but the error-value based design does make this a doable addition.
+
+
+\chapter{Analyses \& Typing}
+\begin{itemize}
+	\item New Abstract Syntax Tree? Decorate existing Abstract Syntax Tree?
+	\item Error messages?
+	\item Polymorphism? Inference? Overloading?
+	\item Problems?
+	\item\ldots
+\end{itemize}
+
+\chapter{Code Generation}
+\begin{itemize}
+	\item Compilation scheme?
+	\item How is data represented? Lists tuples
+	\item Semantics style, call-by-reference, call-by-value?
+	\item How did you solve overloaded functions?
+	\item Polymorphism?
+	\item Printing?
+	\item Problems?
+	\item\ldots
+\end{itemize}
+
+\chapter{Extension}
+Describe your extension in detail
+
+\chapter{Conclusion}
+What does work, what does not etc.
+
+\section{Reflection}
+\begin{itemize}
+	\item What do you think of the project?
+	\item How did it work out?
+	\item How did you divide the work?
+	\item Pitfalls?
+	\item \ldots
+\end{itemize}
+
+\appendix
+\chapter{Grammar}
+
+AST grammar (subject to minor revision: need to add FStmt to reflect code):
+\begin{verbatim}
+SPL = Decl+
+Decl = VarDecl | FunDecl
+VarDecl = ('var' | Type) id '=' Exp ';'
+FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] '{' VarDecl* Stmt+ '}'
+RetType = Type | 'Void'
+FunType = Type* '->' RetType
+Type = BType | '(' Type ',' Type ')' | '[' Type ']' | id
+BType = 'Int' | 'Bool' | 'Char'
+FArgs = id (',' id)*
+Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
+     | 'while '(' Exp ')' Compound
+     | qualid '=' Exp ';'
+     | FunCall ';'
+     | 'return' [ Exp ] ';'
+Compound = '{' Stmt* '}'
+Selector = 'hd' | 'tl' | 'fst' | 'snd'
+qualid = id ('.' Selector)*
+Exp = Arith_top
+Atom = qualid
+     | int | char | 'False' | 'True'
+     | '(' Exp ')'
+     | FunCall
+     | '[]'
+     | '(' Exp ',' Exp ')'
+FunCall = id '(' [ ActArgs ] ')'
+ActArgs = Exp ( ',' Exp )*
+
+
+
+FORALL n in {1..top}: // MEMO: parse this by shunting yard.
+Arith_n = 
+        | Arith_{n-1} Opr_n Arith_n
+        | Arith_n Opl_n Arith_{n-1}
+        | Op1_n Arith_n
+        | Arith_{n-1}
+Opl_n = Opl WITH prio(Opl) == n
+Opr_n = Opr WITH prio(Opr) == n
+Op1_n = Op1 WITH prio(Op1) == n
+Opl = '+' | '-' | '*' | '%'
+    | '==' | '<' | '>' | '<=' | '>=' | '!='
+    | '&&' | '||'
+Opr = ':'
+Op1 = '!' | '-'
+
+Arith_0 = Atom
+
+/***************   TOKENS    ****************/
+int = digit+
+id = alpha ( '_' | alphanumeric )*
+char = "'" any
+keys:
+'var' 'Void' 'Int' 'Bool' 'Char' 'if' 'else' 'while' 'return' 'hd' 'tl' 'fst'
+'snd' 'False' 'True' 
+';' '(' ')' '{' '}' ']' ',' '.' 
+'&&' '||' '+' '%' 
+'<': '<='
+'>': '>='
+'!': '!='
+'=': '=='
+'[': '[]'
+':': '::'
+'-': '->'
+'*': '*/'
+'//' '/*' // Special case: strip in preprocessing
+\end{verbatim}
+
+Parsing grammar:
+\begin{verbatim}
+SPL = Decl+
+Decl = 
+    'var' VarInit
+  | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
+  | id FunOrNamedTypeVarDecl
+FunOrNamedTypeVarDecl = 
+   FunDef                     {peek in {'('}}
+ | VarInit                    {peek in {id} }
+VarInit = id '=' Exp ';'
+FunDef = Tuplish_id [ '::' FunType ] '{' FStmt* '}'
+FStmt = 
+    'var' VarInit
+  | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
+  | KeyWordStmt               {peek in {'if','while','return'}}
+  | id StmtOrVarDecl
+StmtOrVarDecl = 
+   AssignOrCall               {peek in {'.','=','('}}
+ | VarInit                    {peek in {id} }
+RetType = Typ
+FunType = Typ* '->' RetType
+Typ  = NonIdType              {peek in {'Int','Bool','Char','(','['}}
+     | id
+NonIdType = BType | Tuplish_Type | '[' Typ ']'
+BType = 'Int' | 'Bool' | 'Char' | 'Void'
+Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
+ | 'while '(' Exp ')' Compound
+ | id AssignOrCall
+ | 'return' [ Exp ] ';'
+AssignOrCall = 
+   Field '=' Exp ';'           {peek in {'.','='}}
+ | Tuplish_Exp ';'             {peek in {'('}}
+Compound = '{' Stmt* '}'
+Selector = 'hd' | 'tl' | 'fst' | 'snd'
+Field = ('.' Selector)*
+Exp = Arith_top
+Atom = id FieldOrCall
+ | int | char | 'False' | 'True' | '[]'
+ | Tuplish_Exp                       {peek in {'('}}
+FieldOrCall = Field             {peek in <otherwise> }
+            | Tuplish_Exp       {peek in {'('}}
+Tuplish_a = '(' [ a ( ',' a )* ] ')'
+
+
+
+FORALL n in {1..top}: // MEMO: parse this by shunting yard.
+Arith_n = 
+    | Arith_{n-1} Opr_n Arith_n
+    | Arith_n Opl_n Arith_{n-1}
+    | Op1_n Arith_n
+    | Arith_{n-1}
+Opl_n = Opl WITH prio(Opl) == n
+Opr_n = Opr WITH prio(Opr) == n
+Op1_n = Op1 WITH prio(Op1) == n
+Opl = '+' | '-' | '*' | '%'
+| '==' | '<' | '>' | '<=' | '>=' | '!='
+| '&&' | '||'
+Opr = ':'
+Op1 = '!' | '-'
+
+Arith_0 = Atom
+
+/***************   TOKENS    ****************/
+int = digit+
+id = alpha ( '_' | alphanumeric )*
+char = "'" any
+keys:
+'var' 'Void' 'Int' 'Bool' 'Char' 'if' 'else' 'while' 'return' 'hd' 'tl' 'fst'
+'snd' 'False' 'True' 
+';' '(' ')' '{' '}' ']' ',' '.' 
+'&&' '||' '+' '%' 
+'<': '<='
+'>': '>='
+'!': '!='
+'=': '=='
+'[': '[]'
+':': '::'
+'-': '->'
+'*': '*/'
+'//' '/*' // Special case: strip in preprocessing
+\end{verbatim}
+\end{document}

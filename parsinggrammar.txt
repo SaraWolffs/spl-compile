@@ -7,17 +7,8 @@ FunOrNamedTypeVarDecl =
    FunDef                     {peek in {'('}}
  | VarInit                    {peek in {id} }
 VarInit = id '=' Exp ';'
-FunDef = Tuplish_id [ '::' FunType ] '{' FStmt* '}'
-FStmt = 
-    'var' VarInit
-  | NonIdType VarInit         {peek in {'Int','Bool','Char','(','['}}
-  | KeyWordStmt               {peek in {'if','while','return'}}
-  | id StmtOrVarDecl
-StmtOrVarDecl = 
-   AssignOrCall               {peek in {'.','=','('}}
- | VarInit                    {peek in {id} }
-RetType = Typ
-FunType = Typ* '->' RetType
+FunDef = Tuplish_id [ '::' FunType ] Compound
+FunType = Typ* '->' Typ
 Typ  = NonIdType              {peek in {'Int','Bool','Char','(','['}}
      | id
 NonIdType = BType | Tuplish_Type | '[' Typ ']'
@@ -25,10 +16,12 @@ BType = 'Int' | 'Bool' | 'Char' | 'Void'
 Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
  | 'while '(' Exp ')' Compound
  | id AssignOrCall
+ | 'var' VarInit
  | 'return' [ Exp ] ';'
 AssignOrCall = 
    Field '=' Exp ';'           {peek in {'.','='}}
  | Tuplish_Exp ';'             {peek in {'('}}
+ | VarInit                     {peek in {id}}
 Compound = '{' Stmt* '}'
 Selector = 'hd' | 'tl' | 'fst' | 'snd'
 Field = ('.' Selector)*
@@ -81,6 +74,7 @@ keys:
 
 /*************** ADJUSTMENTS ****************/
 
+// Typ // renamed from Type to avoid keyword conflicts in implementation
 // On top of the below (from grammar.txt), extensive left-factoring, and removal
 // of rules so made redundant.
 // Fused FStmt to decrease lookahead (unfuse in semantic analysis)
@@ -100,6 +94,10 @@ keys:
 // FunType = [ FTypes ] '->' RetType // regularized and inlined
 // FTypes = Type [ FTypes ] // replaced by Type* in FunType
 // FArgs = (id ',') FArgs // removed left recursion, then regularized.
+// Added VarDecl to Stmt to simplify function bodies
+// Made empty function bodies legal (meaning "Void noop"), making them coincide
+// compound statements, resulting in
+// FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] Compound
 
 /***************   ERRATA   ****************/
 int = digit+
