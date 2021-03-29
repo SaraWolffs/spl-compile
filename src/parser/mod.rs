@@ -8,7 +8,6 @@ use crate::ast::*;
 use lex::Lex;
 use lex::LexError;
 
-use crate::ast::BareDecl::Var as DVar;
 use crate::ast::BareExp::Var as EVar;
 pub use tok::Loc;
 use tok::Misc::*;
@@ -128,12 +127,13 @@ impl<'s> Parser<'s> {
     }
 
     fn decl(&mut self) -> ParseResult<Option<Decl>> {
+        use crate::ast::BareDecl::*;
         match self.trytok()? {
             None => Ok(None),
             Some((Marker(Var), loc)) => {
                 let (id, exp, loc2) = self.var_init()?;
                 Ok(Some((
-                    DVar(None, id, exp),
+                    Global((None, id, exp)),
                     Some(hull(Span::from(loc), Span::from(loc2))),
                 )))
             }
@@ -146,7 +146,7 @@ impl<'s> Parser<'s> {
                     let typ = self.non_id_type()?;
                     let (id, exp, loc2) = self.var_init()?;
                     Ok(Some((
-                        DVar(Some(typ), id, exp),
+                        Global((Some(typ), id, exp)),
                         Some(hull(Span::from(loc), Span::from(loc2))),
                     )))
                 }
@@ -173,16 +173,6 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
-        todo!();
-    }
-
-    // Might want to rework this to just be included in stmt, VarDecls aren't special
-    // enough to keep separate.
-    fn f_stmt(&mut self) -> ParseResult<FStmt> {
-        todo!();
-    }
-
-    fn stmt_or_var_decl(&mut self, id: Id) -> ParseResult<FStmt> {
         todo!();
     }
 

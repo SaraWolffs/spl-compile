@@ -79,5 +79,5 @@ keys:
 // FArgs = (id ',') FArgs // removed left recursion, then regularized.
 // Added VarDecl to Stmt to simplify function bodies
 // Made empty function bodies legal (meaning "Void noop"), making them coincide
-// compound statements, resulting in
+// with compound statements, resulting in
 // FunDecl = id '(' [ FArgs ] ')' [ '::' FunType ] Compound

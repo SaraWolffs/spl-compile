@@ -54,17 +54,11 @@ pub type SPL = Vec<Decl>;
 pub type Decl = Spanned<BareDecl>;
 #[derive(Debug, PartialEq)]
 pub enum BareDecl {
-    Var(Option<Type>, Id, Exp),
-    Fun(Id, Vec<Id>, Option<FunType>, Vec<Decl>, Vec<Stmt>),
+    Global(VarDecl),
+    Fun(Id, Vec<Id>, Option<FunType>, Vec<Stmt>),
 }
 
-// Might rework this to just be included in Stmt, VarDecls aren't special
-// enough to keep separate.
-#[derive(Debug, PartialEq)]
-pub enum FStmt {
-    DeclStmt(Decl),
-    PureStmt(Stmt),
-}
+pub type VarDecl = (Option<Type>, Id, Exp);
 
 pub type Exp = Spanned<Typed<BareExp>>;
 #[derive(Debug, PartialEq)]
@@ -85,6 +79,7 @@ pub enum BareStmt {
     Assign(Id, Exp),
     Call(Id, Vec<Exp>),
     Ret(Option<Exp>),
+    Local(VarDecl),
 }
 
 pub type FunType = Spanned<BareFunType>;

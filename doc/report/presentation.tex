@@ -1,0 +1,156 @@
+\documentclass{article}
+\usepackage{xcolor}
+
+%\setbeamercovered{transparent}
+
+\title{Lexical Analysis}
+\author{Sal Wolffs (s4064542)}
+%\institute{Radboud University Nijmegen}
+\date{2021-02-23}
+
+\newcommand\heading[1]{%
+  \par\bigskip
+  {\large\bfseries#1}\par\smallskip}
+
+\definecolor{green}{RGB}{0,200,0}
+
+\begin{document}
+\begin{frame}
+\titlepage
+\end{frame}
+
+\begin{frame}
+\frametitle{Implementation Language: Rust}
+    \begin{itemize}[<+(1)->]
+        \item Modern systems programming language
+        \item Inspired by C++, Haskell, and OCaml, among others
+        \item \color{green} \textbf{+} Strong memory safety
+        \item \color{red} \hspace{1mm}\textbf{-}\hspace{1mm} Verbose
+        \item \color{green} \textbf{+} Cheap\&expressive abstractions
+        \item \color{green} \textbf{+} Sound type system
+        \item \color{red} \hspace{1mm}\textbf{-}\hspace{1mm} Not as composable as a true functional language
+        \item \color{red} \hspace{1mm}\textbf{-}\hspace{1mm} Relatively long clean compilation times 
+        \item \color{green} \textbf{+} Fully-featured official toolchain utility \texttt{cargo}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Grammar Adjustments}
+    \begin{itemize}[<+(1)->]
+        \item Inline or introduce some rules, left-factor, and regularize
+            \begin{itemize}[<+(1)->]
+                \item New non-terminals, e.g. \texttt{Compound = `\{'
+                    Stmt\textsuperscript{*} `\}' }
+                \item Removed e.g. \texttt{[FTypes]}, replaced by
+                    \texttt{Type\textsuperscript{*}}
+            \end{itemize}
+        \item Rewrite Exp to use numerical precedence
+        \item Generally simplify by accepting a bit more (e.g. bad
+            \texttt{Void})
+            \begin{itemize}[<+(1)->]
+                \item Semantic analysis can reject nonsense
+            \end{itemize}
+        \item Create separate "parsing grammar" for LL(1) compatibility
+        \item Remove negative integer literals until constant folding
+        \item Character literals: lisp-style, no redundant closers
+        \item In parsing, unify all tuple-like constructions (\texttt{(Exp),
+            (Exp,Exp), (argid,argid,argid)}...)
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Lexer Design}
+    \begin{itemize}[<+(1)->]
+        \item Communication: Lexer object is an ``Iterator''
+            \begin{itemize}[<+(1)->]
+                \item Same convention as in Python
+                \item Similar to sequentially generated lists in Haskell
+            \end{itemize}
+        \item Main logic: massive \texttt{match} statement
+        \item String interning integrated into the lexer
+            \begin{itemize}[<+(1)->]
+                \item Lookup array as a public field
+                \item Trivializes keyword recognition: preload hashmap
+            \end{itemize}
+        \item Special case: dedicated recursive balanced \texttt{/* */} matcher
+        \item Comments are skipped entirely by lexer
+            \begin{itemize}[<+(1)->]
+                \item Simplifies parsing
+                \item Complicates using pretty printer as beautifier
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{AST\&Parser Design}
+    \begin{itemize}[<+(1)->]
+        \item Manual \textit{predictive} LL(1) recursive descent parser: linear
+            time.
+        \item Lookahead 1: lexer implements \texttt{peek}
+        \item AST structure mimics grammar
+        \item Parser call structure mimics parsing grammar
+        \item Problem: Expressions aren't LL(1) 
+            \begin{itemize}[<+(1)->]
+                \item Delegate to shunting yard parser, calls main parser for atoms
+                \item Atoms: variable, literal, call, tuple, parenthesized expression
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Error Handling}
+    \begin{itemize}[<+(1)->]
+        \item Tokens annotated with line, length, and column
+        \item AST nodes annotated with start and end line and column
+        \item Internal errors (compiler bugs) \textit{panic}, yielding a backtrace
+        \item Both lexer and parser return \texttt{Result} types
+            \begin{itemize}[<+(1)->]
+                \item Syntax errors generate \texttt{Result::Err} values
+                \item \texttt{Err} values are propagated up explicitly (think \texttt{Either}
+                    monad)
+            \end{itemize}
+        \item Currently no error recovery, could be added
+            \begin{itemize}[<+(1)->]
+                \item Hardest problem: recovery points. Maybe `;' and balanced `\}', depending on rule
+                \item Could easily log \texttt{Err} to \texttt{Vec} before
+                    recovery
+            \end{itemize}
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Automated Testing}
+    \begin{itemize}[<+(1)->]
+        \item Easily accomplished using \texttt{cargo test}
+        \item \texttt{\#[test]} annotates unit and integration tests
+        \item Uncaught panic (from e.g. failed assert) fails test
+        \item \texttt{\#[cfg(test)]} excepts test modules from production build
+        \item Git hooks run tests before every commit, warn on broken code
+    \end{itemize}
+\end{frame}
+
+\begin{frame}
+    \frametitle{Reflections and Improvements}
+    \begin{itemize}[<+(1)->]
+        \item Excepting education, use libraries to skip this stage:
+            \begin{itemize}[<+(1)->]
+                \item \texttt{logos} for lexer generation
+                \item \texttt{lasso} for string interning
+                \item \texttt{lalrpop} to generate a fast LR(1) parser
+            \end{itemize}
+        \item Error accumulation might be nice. Repair sounds too DWIM though.
+        \item To make the pretty printer a useful formatter, maybe store
+            comments (with location) separately and re-insert them on printing.
+        \item It should be relatively easy to support n-tuples fully. 
+        \item Currently, errors are a string and a location. Better: enum with a
+            pretty printer.
+    \end{itemize}
+\end{frame}
+
+\begin{frame}[plain,c]
+    \begin{center}
+    \Huge{Questions}
+    \end{center}
+\end{frame}
+\end{document}
+
