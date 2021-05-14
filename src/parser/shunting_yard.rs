@@ -69,7 +69,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert_eq!(self.state, Expression);
-        match self.parser.peektok()? {
+        match self.parser.peekloctok()? {
             Some(&(Op(Minus), loc)) => {
                 self.opstack.push((Op(Neg), loc));
                 self.parser.nexttok();
@@ -92,7 +92,7 @@ impl<'s, 'p> ShuntingYard<'s, 'p> {
         use crate::ast::BareOp::*;
         use ShuntState::*;
         assert_eq!(self.state, Operator);
-        match self.parser.peektok()? {
+        match self.parser.peekloctok()? {
             None => {
                 self.lasttok = None;
                 self.state = Done;

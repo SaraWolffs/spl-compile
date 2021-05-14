@@ -33,7 +33,7 @@ macro_rules! fail {
 
 macro_rules! ipe {
     ( $msg : expr ) => {
-        panic!(format!("Internal parser error: {}", $msg))
+        panic!("Internal parser error: {}", $msg)
     };
 }
 
@@ -88,11 +88,18 @@ impl<'s> Parser<'s> {
         self.ts.next()
     }
 
-    fn peektok(&mut self) -> ParseResult<Option<&tok::LocTok>> {
+    fn peekloctok(&mut self) -> ParseResult<Option<&tok::LocTok>> {
         match self.ts.peek() {
             None => Ok(None),
             Some(Err(e)) => lexfail(e.to_owned()),
             Some(Ok(ref loctok)) => Ok(Some(loctok)),
+        }
+    }
+    fn peektok(&mut self) -> ParseResult<Option<&tok::Token>> {
+        match self.ts.peek() {
+            None => Ok(None),
+            Some(Err(e)) => lexfail(e.to_owned()),
+            Some(Ok((ref tok, _))) => Ok(Some(tok)),
         }
     }
 
@@ -113,7 +120,7 @@ impl<'s> Parser<'s> {
     }
 
     fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
-        match self.peektok()? {
+        match self.peekloctok()? {
             None => eof(format!("{:?}", tok)),
             Some(&(found, loc)) => {
                 if found == tok {
@@ -156,17 +163,24 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_or_named_type_var_decl(&mut self, id: Id) -> ParseResult<Decl> {
-        todo!();
-    }
-    /*
-    fn fun_or_named_type_var_decl(ts: &mut TokStream) -> ParseResult<Decl> {
-        match ts.next(){
-            None => fail!("Ran out of tokens while parsing declaration with named type"),
-            Some(Ok((tok,loc))) => unimplemented!(), // parse
-            Some(Err(e)) => unimplemented!() //unexpected!(),
+        use crate::ast::BareDecl::*;
+        use BareType::Typename;
+        match self.peektok()? {
+            None => eof("'(' or identifier".to_owned()),
+            Some(Marker(ParenOpen)) => self.fun_def(id),
+            Some(IdTok(_)) => {
+                let (varid, exp, loc2) = self.var_init()?;
+                Ok((
+                    Global((Some((Typename(id), id.1)), varid, exp)),
+                    Some(hull(Span::from(id.1.unwrap()), Span::from(loc2))),
+                ))
+            }
+            _ => unexpected(
+                self.peekloctok().unwrap().unwrap().to_owned(),
+                "'(' or identifier".to_owned(),
+            ),
         }
     }
-    */
 
     fn var_init(&mut self) -> ParseResult<(Id, Exp, Loc)> {
         todo!();
@@ -243,7 +257,7 @@ impl<'s> Parser<'s> {
 
     fn field_or_call(&mut self, id: Id) -> ParseResult<Exp> {
         use BareExp::*;
-        match self.peektok()? {
+        match self.peekloctok()? {
             None => Ok(((Var(id, Vec::new()), None), id.1)),
             Some((tok, _)) => match tok {
                 Marker(ParenOpen) => {
@@ -270,7 +284,7 @@ impl<'s> Parser<'s> {
             }
         };
         let mut vec = Vec::new();
-        if let Some(&(Marker(ParenClose), loc)) = self.peektok()? {
+        if let Some(&(Marker(ParenClose), loc)) = self.peekloctok()? {
             return {
                 self.nexttok();
                 Ok((vec, hull(span, loc.into())))
