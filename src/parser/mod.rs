@@ -8,12 +8,12 @@ use crate::ast::*;
 use lex::Lex;
 use lex::LexError;
 
-use crate::ast::BareExp::Var as EVar;
+//use crate::ast::BareExp::Var as EVar;
 pub use tok::Loc;
 use tok::Misc::*;
 use tok::Token;
 use tok::Token::Lit as LitTok;
-use tok::Token::Selector as SelectTok;
+//use tok::Token::Selector as SelectTok;
 use tok::Token::*;
 
 type TokStream<'s> = lex::Lex<'s>;
@@ -108,6 +108,11 @@ impl<'s> Parser<'s> {
         //.map_err(|(msg, loc)| (msg, Some(loc)))
     }
 
+    fn sometok(&mut self, expected: &str) -> ParseResult<tok::LocTok> {
+        self.trytok()?
+            .ok_or_else(|| ParseError(format!("EOF while looking for {}", expected), None))
+    }
+
     fn unpeektok(&mut self, val: tok::LocTok) -> ParseResult<&tok::LocTok> {
         self.ts
             .unpeek(val)
@@ -119,7 +124,7 @@ impl<'s> Parser<'s> {
         unexpected(found, expected)
     }
 
-    fn expect(&mut self, tok: Token) -> ParseResult<tok::LocTok> {
+    fn expect(&mut self, tok: Token, expected: &str) -> ParseResult<tok::LocTok> {
         match self.peekloctok()? {
             None => eof(format!("{:?}", tok)),
             Some(&(found, loc)) => {
@@ -127,9 +132,16 @@ impl<'s> Parser<'s> {
                     self.nexttok();
                     Ok((found, loc))
                 } else {
-                    unexpected((found, loc), format!("{:?}", tok))
+                    unexpected((found, loc), expected.to_owned())
                 }
             }
+        }
+    }
+
+    fn parse_id(&mut self) -> ParseResult<Id> {
+        match self.sometok("identifier")? {
+            (IdTok(id), idloc) => Ok((id, Some(idloc.into()))),
+            found => unexpected(found, "identifier".to_owned()),
         }
     }
 
@@ -183,10 +195,15 @@ impl<'s> Parser<'s> {
     }
 
     fn var_init(&mut self) -> ParseResult<(Id, Exp, Loc)> {
-        todo!();
+        let id = self.parse_id()?;
+        let _ = self.expect(Marker(Assign), "'='")?;
+        let exp = self.exp()?;
+        let (_, loc) = self.expect(Marker(Semicolon), "';'")?;
+        Ok((id, exp, loc))
     }
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
+        let args = self.tuplish(Parser::parse_id);
         todo!();
     }
 
@@ -307,6 +324,7 @@ impl<'s> Parser<'s> {
 }
 
 #[cfg(test)]
+#[allow(unused_imports)]
 mod tests {
     use super::lex::*;
     use super::*;
