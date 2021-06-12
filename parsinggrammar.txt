@@ -9,7 +9,7 @@ FunOrNamedTypeVarDecl =
 VarInit = id '=' Exp ';'
 FunDef = Tuplish_id [ '::' FunType ] Compound
 FunType = Typ* '->' Typ
-Typ  = NonIdType              {peek in {'Int','Bool','Char','(','['}}
+Typ  = NonIdType              {peek in {'Int','Bool','Char','Void','(','['}}
      | id
 NonIdType = BType | Tuplish_Type | '[' Typ ']'
 BType = 'Int' | 'Bool' | 'Char' | 'Void'

@@ -16,6 +16,8 @@ use tok::Token::Lit as LitTok;
 //use tok::Token::Selector as SelectTok;
 use tok::Token::*;
 
+use self::tok::LocTok;
+
 type TokStream<'s> = lex::Lex<'s>;
 
 pub struct Parser<'s> {
@@ -196,7 +198,7 @@ impl<'s> Parser<'s> {
 
     fn var_init(&mut self) -> ParseResult<(Id, Exp, Loc)> {
         let id = self.parse_id()?;
-        let _ = self.expect(Marker(Assign), "'='")?;
+        let _: LocTok = self.expect(Marker(Assign), "'='")?;
         let exp = self.exp()?;
         let (_, loc) = self.expect(Marker(Semicolon), "';'")?;
         Ok((id, exp, loc))
@@ -204,10 +206,12 @@ impl<'s> Parser<'s> {
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
         let args = self.tuplish(Parser::parse_id);
-        todo!();
-    }
-
-    fn ret_type(&mut self) -> ParseResult<Type> {
+        let ftype = if let Some(Marker(TypeColon)) = self.peektok()? {
+            let _: LocTok = self.expect(Marker(TypeColon), "'::'").unwrap();
+            Some(self.fun_type()?)
+        } else {
+            None
+        };
         todo!();
     }
 

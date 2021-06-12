@@ -48,6 +48,7 @@ pub(super) enum Misc {
     TypeColon,
 }
 
+#[must_use]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub(super) enum Token {
     IdTok(BareId),
