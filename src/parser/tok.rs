@@ -73,7 +73,7 @@ pub(super) trait TokAble {
 
 impl TokAble for u32 {
     fn to_tok(self) -> Token {
-        Token::IdTok(self as BareId)
+        Token::IdTok(BareId(self))
     }
 }
 

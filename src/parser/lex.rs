@@ -5,10 +5,10 @@ use std::str::CharIndices;
 //use core::slice::{Iter};
 
 use super::tok::*;
-use crate::ast::BType::*;
 use crate::ast::BareOp::*;
 use crate::ast::BareSelector::*;
 use crate::ast::LitVal::*;
+use crate::ast::{BType::*, BareId};
 use Misc::*;
 
 pub(super) struct Lex<'s> {
@@ -138,7 +138,7 @@ impl<'sub, 's: 'sub> Lex<'s> {
         *wordtoks.entry(word).or_insert_with(|| {
             names.push(word);
             *vcount += 1;
-            crate::parser::lex::Token::IdTok(*vcount - 1)
+            crate::parser::lex::Token::IdTok(BareId(*vcount - 1))
         })
     }
     fn parse_char(&mut self) -> Result<LocTok, &'static str> {
@@ -406,12 +406,12 @@ mod tests {
         assert_eq!(toks.next().unwrap(), (Token::Marker(While), tloc(0, 4, 5)));
         assert_eq!(
             toks.next().unwrap(),
-            (Token::IdTok(foo + 1), tloc(0, 10, 3))
+            (Token::IdTok(BareId(foo.0 + 1)), tloc(0, 10, 3))
         );
         assert_eq!(toks.next().unwrap(), (Token::IdTok(foo), tloc(0, 14, 3)));
         assert_eq!(toks.next(), None);
-        assert_eq!(lexer.names[foo as usize], "foo");
-        assert_eq!(lexer.names[(foo + 1) as usize], "b4r");
+        assert_eq!(lexer.names[foo.0 as usize], "foo");
+        assert_eq!(lexer.names[(foo.0 + 1) as usize], "b4r");
     }
 
     #[test]

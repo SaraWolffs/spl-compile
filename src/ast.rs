@@ -52,6 +52,7 @@ pub type Spanned<T> = (T, Option<Span>);
 pub type SPL = Vec<Decl>;
 
 pub type Decl = Spanned<BareDecl>;
+#[must_use]
 #[derive(Debug, PartialEq)]
 pub enum BareDecl {
     Global(VarDecl),
@@ -61,6 +62,7 @@ pub enum BareDecl {
 pub type VarDecl = (Option<Type>, Id, Exp);
 
 pub type Exp = Spanned<Typed<BareExp>>;
+#[must_use]
 #[derive(Debug, PartialEq)]
 pub enum BareExp {
     Var(Id, Vec<Selector>),
@@ -72,6 +74,7 @@ pub enum BareExp {
 }
 
 pub type Stmt = Spanned<BareStmt>;
+#[must_use]
 #[derive(Debug, PartialEq)]
 pub enum BareStmt {
     ITE(Exp, Vec<Stmt>, Vec<Stmt>),
@@ -86,6 +89,7 @@ pub type FunType = Spanned<BareFunType>;
 pub type BareFunType = (Vec<Type>, Type);
 
 pub type Type = Spanned<BareType>;
+#[must_use]
 #[derive(Debug, PartialEq)]
 pub enum BareType {
     Lit(BType),
@@ -99,10 +103,13 @@ pub type Typed<T> = (T, Option<Type>);
 /** Terminal symbols/tokens **/
 pub type Id = Spanned<BareId>;
 
-pub type BareId = u32;
+#[must_use]
+#[derive(Copy, Clone, Debug, PartialEq, Eq)]
+pub struct BareId(pub u32);
 
 pub type Selector = Spanned<BareSelector>;
 
+#[must_use]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BareSelector {
     Hd,
@@ -111,6 +118,7 @@ pub enum BareSelector {
     Snd,
 }
 
+#[must_use]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BType {
     IntT,
@@ -119,6 +127,7 @@ pub enum BType {
     UnitT,
 }
 
+#[must_use]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum LitVal {
     Int(i64),
@@ -128,7 +137,7 @@ pub enum LitVal {
 }
 
 pub type Op = Spanned<BareOp>;
-
+#[must_use]
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub enum BareOp {
     And,

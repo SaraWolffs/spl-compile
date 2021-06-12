@@ -231,7 +231,7 @@ impl<'s> Parser<'s> {
         todo!();
     }
 
-    fn stmt(&mut self) -> ParseResult<Stmt> {
+    fn stmt(&mut self) -> ParseResult<Option<Stmt>> {
         todo!();
     }
 
@@ -463,7 +463,7 @@ mod tests {
         use crate::ast::BareExp::*;
         let mut p = Parser::new("foo()");
         let test = p.exp();
-        let foo = p.ts.names.iter().position(|&e| e == "foo").unwrap() as u32;
+        let foo = BareId(p.ts.names.iter().position(|&e| e == "foo").unwrap() as u32);
         let correct = Ok((
             (Call((foo, tspan(0, 0, 0, 3)), Vec::new()), None),
             tspan(0, 0, 0, 5),
