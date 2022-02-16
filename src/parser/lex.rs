@@ -187,7 +187,7 @@ impl<'sub, 's: 'sub> Lex<'s> {
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Some(Err(LexError($reason.to_string(), $loc)));
+        return Some(Err(LexError($reason.to_string(), $loc)))
     };
 }
 

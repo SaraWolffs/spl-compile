@@ -5,6 +5,7 @@ mod tok;
 use crate::ast::Selector;
 use crate::ast::Span;
 use crate::ast::*;
+use crate::ast::BareDecl::*;
 use lex::Lex;
 use lex::LexError;
 
@@ -26,10 +27,10 @@ pub struct Parser<'s> {
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Err(ParseError($reason.to_string(), Some($loc)));
+        return Err(ParseError($reason.to_string(), Some($loc)))
     };
     ( $reason : expr ) => {
-        return Err(ParseError($reason.to_string(), None));
+        return Err(ParseError($reason.to_string(), None))
     };
 }
 
@@ -148,7 +149,6 @@ impl<'s> Parser<'s> {
     }
 
     fn decl(&mut self) -> ParseResult<Option<Decl>> {
-        use crate::ast::BareDecl::*;
         match self.trytok()? {
             None => Ok(None),
             Some((Marker(Var), loc)) => {
@@ -177,7 +177,6 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_or_named_type_var_decl(&mut self, id: Id) -> ParseResult<Decl> {
-        use crate::ast::BareDecl::*;
         use BareType::Typename;
         match self.peektok()? {
             None => eof("'(' or identifier".to_owned()),
@@ -205,14 +204,15 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
-        let args = self.tuplish(Parser::parse_id);
+        let (args,_) = self.tuplish(Parser::parse_id)?;
         let ftype = if let Some(Marker(TypeColon)) = self.peektok()? {
             let _: LocTok = self.expect(Marker(TypeColon), "'::'").unwrap();
             Some(self.fun_type()?)
         } else {
             None
         };
-        todo!();
+        let (body,bspan) = self.compound()?;
+        Ok((Fun(id, args, ftype, body), opthull(id.1,Some(bspan))))
     }
 
     fn fun_type(&mut self) -> ParseResult<FunType> {
@@ -239,7 +239,7 @@ impl<'s> Parser<'s> {
         todo!();
     }
 
-    fn compound(&mut self) -> ParseResult<Vec<Stmt>> {
+    fn compound(&mut self) -> ParseResult<(Vec<Stmt>, Span)> {
         todo!();
     }
 
@@ -268,7 +268,7 @@ impl<'s> Parser<'s> {
                     if coords.len() == 1 {
                         Ok((coords.into_iter().next().unwrap().0, Some(span)))
                     } else {
-                        Ok(((Tuple(coords), None), Some(span)))
+                        Ok(((Tuple(coords), None), Some(span))) // unknown type, known location
                     }
                 }
                 x => unexpected((x, loc), "identifier, literal, or '('".to_string()),

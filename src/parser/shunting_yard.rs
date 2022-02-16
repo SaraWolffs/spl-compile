@@ -2,10 +2,10 @@ use super::*;
 
 macro_rules! fail {
     ( $reason : expr, $loc : expr ) => {
-        return Err(ParseError($reason.to_string(), Some($loc)));
+        return Err(ParseError($reason.to_string(), Some($loc)))
     };
     ( $reason : expr ) => {
-        return Err(ParseError($reason.to_string(), None));
+        return Err(ParseError($reason.to_string(), None))
     };
 }
 
