@@ -127,7 +127,7 @@ impl<'s> Parser<'s> {
         unexpected(found, expected)
     }
 
-    fn expect(&mut self, tok: Token, expected: &str) -> ParseResult<tok::LocTok> {
+    fn consume(&mut self, tok: Token, expected: &str) -> ParseResult<tok::LocTok> {
         match self.peekloctok()? {
             None => eof(format!("{:?}", tok)),
             Some(&(found, loc)) => {
@@ -149,6 +149,21 @@ impl<'s> Parser<'s> {
                 acc.push(parsed);
             } else {
                 break Ok(acc);
+            }
+        }
+    }
+
+    fn one<T>(
+        &mut self,
+        p: fn(&mut Self) -> ParseResult<Option<T>>,
+        expected: &str,
+    ) -> ParseResult<T> {
+        if let Some(parsed) = p(self)? {
+            Ok(parsed)
+        } else {
+            match self.peekloctok()? {
+                None => eof(expected.to_owned()),
+                Some(&(found, loc)) => unexpected((found, loc), expected.to_owned()),
             }
         }
     }
@@ -209,16 +224,16 @@ impl<'s> Parser<'s> {
 
     fn var_init(&mut self) -> ParseResult<(Id, Exp, Loc)> {
         let id = self.parse_id()?;
-        let _: LocTok = self.expect(Marker(Assign), "'='")?;
+        let _: LocTok = self.consume(Marker(Assign), "'='")?;
         let exp = self.exp()?;
-        let (_, loc) = self.expect(Marker(Semicolon), "';'")?;
+        let (_, loc) = self.consume(Marker(Semicolon), "';'")?;
         Ok((id, exp, loc))
     }
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
         let (args, _) = self.tuplish(Parser::parse_id)?;
         let ftype = if let Some(Marker(TypeColon)) = self.peektok()? {
-            let _: LocTok = self.expect(Marker(TypeColon), "'::'").unwrap();
+            let _: LocTok = self.consume(Marker(TypeColon), "'::'").unwrap();
             Some(self.fun_type()?)
         } else {
             None
@@ -228,7 +243,15 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_type(&mut self) -> ParseResult<FunType> {
-        todo!();
+        let intypes = self.many(Self::typ)?;
+        let (_, arrowloc) = self.consume(Marker(Arrow), "'->'")?;
+        let startspan = if let Some((_, typloc)) = intypes.first() {
+            typloc.to_owned()
+        } else {
+            Some(arrowloc.into())
+        };
+        let outtype @ (_, endspan) = self.one(Self::typ, "type")?;
+        Ok(((intypes, outtype), opthull(startspan, endspan)))
     }
 
     fn typ(&mut self) -> ParseResult<Option<Type>> {
