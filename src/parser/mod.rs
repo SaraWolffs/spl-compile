@@ -2,10 +2,10 @@ mod lex;
 mod shunting_yard;
 mod tok;
 
+use crate::ast::BareDecl::*;
 use crate::ast::Selector;
 use crate::ast::Span;
 use crate::ast::*;
-use crate::ast::BareDecl::*;
 use lex::Lex;
 use lex::LexError;
 
@@ -141,6 +141,18 @@ impl<'s> Parser<'s> {
         }
     }
 
+    fn many<T>(&mut self, one: fn(&mut Self) -> ParseResult<Option<T>>) -> ParseResult<Vec<T>> {
+        let mut acc = Vec::new();
+        loop {
+            let next = one(self)?;
+            if let Some(parsed) = next {
+                acc.push(parsed);
+            } else {
+                break Ok(acc);
+            }
+        }
+    }
+
     fn parse_id(&mut self) -> ParseResult<Id> {
         match self.sometok("identifier")? {
             (IdTok(id), idloc) => Ok((id, Some(idloc.into()))),
@@ -204,22 +216,22 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_def(&mut self, id: Id) -> ParseResult<Decl> {
-        let (args,_) = self.tuplish(Parser::parse_id)?;
+        let (args, _) = self.tuplish(Parser::parse_id)?;
         let ftype = if let Some(Marker(TypeColon)) = self.peektok()? {
             let _: LocTok = self.expect(Marker(TypeColon), "'::'").unwrap();
             Some(self.fun_type()?)
         } else {
             None
         };
-        let (body,bspan) = self.compound()?;
-        Ok((Fun(id, args, ftype, body), opthull(id.1,Some(bspan))))
+        let (body, bspan) = self.compound()?;
+        Ok((Fun(id, args, ftype, body), opthull(id.1, Some(bspan))))
     }
 
     fn fun_type(&mut self) -> ParseResult<FunType> {
         todo!();
     }
 
-    fn typ(&mut self) -> ParseResult<Type> {
+    fn typ(&mut self) -> ParseResult<Option<Type>> {
         todo!();
     }
 
