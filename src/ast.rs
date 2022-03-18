@@ -93,7 +93,7 @@ pub type Type = Spanned<BareType>;
 #[derive(Debug, PartialEq)]
 pub enum BareType {
     Lit(BType),
-    Typename(Id),
+    Typename(BareId),
     Tuple(Vec<Type>),
     List(Box<Type>),
 }

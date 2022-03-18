@@ -141,10 +141,10 @@ impl<'s> Parser<'s> {
         }
     }
 
-    fn many<T>(&mut self, one: fn(&mut Self) -> ParseResult<Option<T>>) -> ParseResult<Vec<T>> {
+    fn many<T>(&mut self, single: fn(&mut Self) -> ParseResult<Option<T>>) -> ParseResult<Vec<T>> {
         let mut acc = Vec::new();
         loop {
-            let next = one(self)?;
+            let next = single(self)?;
             if let Some(parsed) = next {
                 acc.push(parsed);
             } else {
@@ -204,14 +204,14 @@ impl<'s> Parser<'s> {
     }
 
     fn fun_or_named_type_var_decl(&mut self, id: Id) -> ParseResult<Decl> {
-        use BareType::Typename;
+        use crate::ast::BareType::*;
         match self.peektok()? {
             None => eof("'(' or identifier".to_owned()),
             Some(Marker(ParenOpen)) => self.fun_def(id),
             Some(IdTok(_)) => {
                 let (varid, exp, loc2) = self.var_init()?;
                 Ok((
-                    Global((Some((Typename(id), id.1)), varid, exp)),
+                    Global((Some((Typename(id.0), id.1)), varid, exp)),
                     Some(hull(Span::from(id.1.unwrap()), Span::from(loc2))),
                 ))
             }
@@ -255,19 +255,49 @@ impl<'s> Parser<'s> {
     }
 
     fn typ(&mut self) -> ParseResult<Option<Type>> {
-        todo!();
+        use crate::ast::BareType::*;
+        match self.peektok()? {
+            Some(TypeTok(_)) | Some(Marker(BraceOpen)) | Some(Marker(BrackOpen)) => Ok(Some(self.non_id_type()?)),
+            Some(IdTok(_)) => {
+                if let (IdTok(id),idloc) = self.sometok("identifier").unwrap() {
+                Ok(Some((Typename(id),Some(idloc.into()))))
+                } else {
+                    unreachable!();
+                }
+            }
+            _ => Ok(None),
+        }
     }
 
     fn non_id_type(&mut self) -> ParseResult<Type> {
-        todo!();
-    }
-
-    fn b_type(&mut self) -> ParseResult<BType> {
-        todo!();
+        use crate::ast::BareType::*;
+        if let Some((tok,loc)) = self.trytok()? {
+            let span : Span = loc.into();
+            match tok {
+                TypeTok(t) => Ok((Lit(t),Some(span))), // inline b_type
+                Marker(BraceOpen) => {
+                    self.unpeektok((tok,loc))?;
+                    let (tvec,tupspan) = self.tuplish(|p| p.one(Self::typ,"type"))?;
+                    Ok((Tuple(tvec), Some(tupspan)))
+                }
+                Marker(BrackOpen) => {
+                    let inner =  self.one(Self::typ,"type")?;
+                    let (_,endloc) : LocTok = self.consume(Marker(BrackClose), "']'")?;
+                    Ok((List(Box::new(inner)), Some(hull(span,endloc.into()))))
+                }
+                _ => unexpected((tok,loc), "non-identifier type".to_owned())
+            }
+        } else {
+            eof("type".to_owned())
+        }
     }
 
     fn stmt(&mut self) -> ParseResult<Option<Stmt>> {
-        todo!();
+        if let Some((tok,loc)) = self.trytok()? {
+            todo!();
+        } else {
+            Ok(None)
+        }
     }
 
     fn assign_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
