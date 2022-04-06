@@ -2,6 +2,8 @@ mod lex;
 mod shunting_yard;
 mod tok;
 
+use std::panic::AssertUnwindSafe;
+
 use crate::ast::BareDecl::*;
 use crate::ast::Selector;
 use crate::ast::Span;
@@ -322,15 +324,39 @@ impl<'s> Parser<'s> {
                     let (body, endspan) = self.compound()?;
                     Ok(Some((While(cond, body), Some(hull(startspan, endspan)))))
                 } // end while arm
-                IdTok(id) => todo!(),
-                Marker(Var) => todo!(),
-                Marker(Return) => todo!(),
+                IdTok(id) => Ok(Some(self.assign_or_call((id, Some(startspan)))?)),
+                Marker(Var) => {
+                    // parse untyped local var declaration
+                    let (id, exp, endloc) = self.var_init()?;
+                    Ok(Some((
+                        Local((None, id, exp)),
+                        Some(hull(startspan, endloc.into())),
+                    )))
+                } // end untyped local vardec arm
+                Marker(Return) => {
+                    // parse return
+                    if let Some((Marker(Semicolon), endloc)) = self.peekloctok()? {
+                        Ok(Some((
+                            Ret(None),
+                            Some(hull(startspan, endloc.to_owned().into())),
+                        )))
+                    } else {
+                        let retval = self.exp()?;
+                        let (_, endloc) = self.consume(Marker(Semicolon), ";")?;
+                        Ok(Some((
+                            Ret(Some(retval)),
+                            Some(hull(startspan, endloc.into())),
+                        )))
+                    }
+                } //end return arm
                 _ => {
+                    // no statement found, caller decides if that's an issue.
                     self.unpeektok(loctok)?;
                     Ok(None)
                 }
             }
         } else {
+            // EOF. This is probably a problem for the caller, but not ours.
             Ok(None)
         }
     }
