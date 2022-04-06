@@ -2,8 +2,8 @@
 pub struct Span {
     pub startline: u32,
     pub endline: u32,
-    pub startcol: u16,
-    pub endcol: u16,
+    pub startcol: u32,
+    pub endcol: u32,
 }
 
 impl From<crate::parser::Loc> for Span {
@@ -11,14 +11,14 @@ impl From<crate::parser::Loc> for Span {
         Span {
             startline: loc.line,
             endline: loc.line,
-            startcol: loc.col,
-            endcol: loc.col + loc.len,
+            startcol: loc.col as u32,
+            endcol: loc.col as u32 + loc.len as u32,
         }
     }
 }
 
 impl Span {
-    pub(crate) fn new(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Self {
+    pub(crate) fn new(startline: u32, endline: u32, startcol: u32, endcol: u32) -> Self {
         Self {
             startline,
             endline,

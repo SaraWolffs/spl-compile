@@ -293,8 +293,33 @@ impl<'s> Parser<'s> {
     }
 
     fn stmt(&mut self) -> ParseResult<Option<Stmt>> {
-        if let Some((tok,loc)) = self.trytok()? {
-            todo!();
+        use BareStmt::*;
+        use crate::parser::tok::Misc::While as WhileTok;
+        if let Some(loctok@(tok,loc)) = self.trytok()? {
+            let startspan = loc.into();
+            match tok {
+                Marker(If) => { // parse if-then-else
+                    let _ : LocTok = self.consume(Marker(ParenOpen), "(")?;
+                    let cond = self.exp()?;
+                    let _ : LocTok = self.consume(Marker(ParenClose), ")")?;
+                    let (then,thenspan) = self.compound()?;
+                    let (alt, endspan ) = 
+                    if let Some(Marker(Else)) = self.peektok()? {
+                        todo!()
+                    } else {
+                        (Vec::new(),thenspan)
+                    };
+                    Ok(Some((ITE(cond,then,alt),Some(hull(startspan,endspan)))))
+                }, // end if-then-else arm
+                Marker(WhileTok) => todo!(),    
+                IdTok(id) => todo!(),
+                Marker(Var) => todo!(),
+                Marker(Return) => todo!(),
+                _ => {
+                    self.unpeektok(loctok)?;
+                    Ok(None)
+                }
+            }
         } else {
             Ok(None)
         }
@@ -397,7 +422,7 @@ impl<'s> Parser<'s> {
 mod tests {
     use super::lex::*;
     use super::*;
-    fn tspan(startline: u32, endline: u32, startcol: u16, endcol: u16) -> Option<Span> {
+    fn tspan(startline: u32, endline: u32, startcol: u32, endcol: u32) -> Option<Span> {
         Some(Span::new(startline, endline, startcol, endcol))
     }
 

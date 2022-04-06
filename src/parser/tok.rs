@@ -5,7 +5,7 @@ pub struct Loc {
     pub line: u32,
     pub col: u16,
     pub len: u16,
-}
+} // TODO: unify this with span to undo technical debt from premature optimization.
 
 impl Loc {
     // TODO: guard against overflow
