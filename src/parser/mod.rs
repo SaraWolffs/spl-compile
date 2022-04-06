@@ -257,10 +257,12 @@ impl<'s> Parser<'s> {
     fn typ(&mut self) -> ParseResult<Option<Type>> {
         use crate::ast::BareType::*;
         match self.peektok()? {
-            Some(TypeTok(_)) | Some(Marker(BraceOpen)) | Some(Marker(BrackOpen)) => Ok(Some(self.non_id_type()?)),
+            Some(TypeTok(_)) | Some(Marker(BraceOpen)) | Some(Marker(BrackOpen)) => {
+                Ok(Some(self.non_id_type()?))
+            }
             Some(IdTok(_)) => {
-                if let (IdTok(id),idloc) = self.sometok("identifier").unwrap() {
-                Ok(Some((Typename(id),Some(idloc.into()))))
+                if let (IdTok(id), idloc) = self.sometok("identifier").unwrap() {
+                    Ok(Some((Typename(id), Some(idloc.into()))))
                 } else {
                     unreachable!();
                 }
@@ -271,21 +273,21 @@ impl<'s> Parser<'s> {
 
     fn non_id_type(&mut self) -> ParseResult<Type> {
         use crate::ast::BareType::*;
-        if let Some((tok,loc)) = self.trytok()? {
-            let span : Span = loc.into();
+        if let Some((tok, loc)) = self.trytok()? {
+            let span: Span = loc.into();
             match tok {
-                TypeTok(t) => Ok((Lit(t),Some(span))), // inline b_type
+                TypeTok(t) => Ok((Lit(t), Some(span))), // inline b_type
                 Marker(BraceOpen) => {
-                    self.unpeektok((tok,loc))?;
-                    let (tvec,tupspan) = self.tuplish(|p| p.one(Self::typ,"type"))?;
+                    self.unpeektok((tok, loc))?;
+                    let (tvec, tupspan) = self.tuplish(|p| p.one(Self::typ, "type"))?;
                     Ok((Tuple(tvec), Some(tupspan)))
                 }
                 Marker(BrackOpen) => {
-                    let inner =  self.one(Self::typ,"type")?;
-                    let (_,endloc) : LocTok = self.consume(Marker(BrackClose), "']'")?;
-                    Ok((List(Box::new(inner)), Some(hull(span,endloc.into()))))
+                    let inner = self.one(Self::typ, "type")?;
+                    let (_, endloc): LocTok = self.consume(Marker(BrackClose), "']'")?;
+                    Ok((List(Box::new(inner)), Some(hull(span, endloc.into()))))
                 }
-                _ => unexpected((tok,loc), "non-identifier type".to_owned())
+                _ => unexpected((tok, loc), "non-identifier type".to_owned()),
             }
         } else {
             eof("type".to_owned())
@@ -293,25 +295,33 @@ impl<'s> Parser<'s> {
     }
 
     fn stmt(&mut self) -> ParseResult<Option<Stmt>> {
-        use BareStmt::*;
         use crate::parser::tok::Misc::While as WhileTok;
-        if let Some(loctok@(tok,loc)) = self.trytok()? {
+        use BareStmt::*;
+        if let Some(loctok @ (tok, loc)) = self.trytok()? {
             let startspan = loc.into();
             match tok {
-                Marker(If) => { // parse if-then-else
-                    let _ : LocTok = self.consume(Marker(ParenOpen), "(")?;
+                Marker(If) => {
+                    // parse if-then-else
+                    let _: LocTok = self.consume(Marker(ParenOpen), "(")?;
                     let cond = self.exp()?;
-                    let _ : LocTok = self.consume(Marker(ParenClose), ")")?;
-                    let (then,thenspan) = self.compound()?;
-                    let (alt, endspan ) = 
-                    if let Some(Marker(Else)) = self.peektok()? {
-                        todo!()
+                    let _: LocTok = self.consume(Marker(ParenClose), ")")?;
+                    let (then, thenspan) = self.compound()?;
+                    let (alt, endspan) = if let Some(Marker(Else)) = self.peektok()? {
+                        self.nexttok();
+                        self.compound()?
                     } else {
-                        (Vec::new(),thenspan)
+                        (Vec::new(), thenspan)
                     };
-                    Ok(Some((ITE(cond,then,alt),Some(hull(startspan,endspan)))))
-                }, // end if-then-else arm
-                Marker(WhileTok) => todo!(),    
+                    Ok(Some((ITE(cond, then, alt), Some(hull(startspan, endspan)))))
+                } // end if-then-else arm
+                Marker(WhileTok) => {
+                    // parse while
+                    let _: LocTok = self.consume(Marker(ParenOpen), "(")?;
+                    let cond = self.exp()?;
+                    let _: LocTok = self.consume(Marker(ParenClose), ")")?;
+                    let (body, endspan) = self.compound()?;
+                    Ok(Some((While(cond, body), Some(hull(startspan, endspan)))))
+                } // end while arm
                 IdTok(id) => todo!(),
                 Marker(Var) => todo!(),
                 Marker(Return) => todo!(),

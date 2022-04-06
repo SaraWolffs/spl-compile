@@ -165,10 +165,10 @@ impl BareOp {
             Cons => 15,
             Or => 20,
             And => 30,
-            Not => 50, 
-            Eq => 60, // Note: this and other comparators are not associative
+            Not => 50,
+            Eq => 60,  // Note: this and other comparators are not associative
             Neq => 60, // either mention deferring to type checking in report
-            Lt => 60, // or include semantics
+            Lt => 60,  // or include semantics
             Leq => 60,
             Gt => 60,
             Geq => 60,
