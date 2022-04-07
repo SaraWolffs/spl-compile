@@ -315,7 +315,7 @@ impl<'s> Parser<'s> {
                         (Vec::new(), thenspan)
                     };
                     Ok(Some((ITE(cond, then, alt), Some(hull(startspan, endspan)))))
-                } // end if-then-else arm
+                }
                 Marker(WhileTok) => {
                     // parse while
                     let _: LocTok = self.consume(Marker(ParenOpen), "(")?;
@@ -323,7 +323,7 @@ impl<'s> Parser<'s> {
                     let _: LocTok = self.consume(Marker(ParenClose), ")")?;
                     let (body, endspan) = self.compound()?;
                     Ok(Some((While(cond, body), Some(hull(startspan, endspan)))))
-                } // end while arm
+                }
                 IdTok(id) => Ok(Some(self.assign_or_call((id, Some(startspan)))?)),
                 Marker(Var) => {
                     // parse untyped local var declaration
@@ -332,7 +332,7 @@ impl<'s> Parser<'s> {
                         Local((None, id, exp)),
                         Some(hull(startspan, endloc.into())),
                     )))
-                } // end untyped local vardec arm
+                }
                 Marker(Return) => {
                     // parse return
                     if let Some((Marker(Semicolon), endloc)) = self.peekloctok()? {
@@ -348,7 +348,7 @@ impl<'s> Parser<'s> {
                             Some(hull(startspan, endloc.into())),
                         )))
                     }
-                } //end return arm
+                }
                 _ => {
                     // no statement found, caller decides if that's an issue.
                     self.unpeektok(loctok)?;
@@ -361,6 +361,7 @@ impl<'s> Parser<'s> {
         }
     }
 
+    // TODO: rename this to include possibility of this being a var init.
     fn assign_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
         todo!();
     }
