@@ -2,8 +2,6 @@ mod lex;
 mod shunting_yard;
 mod tok;
 
-use std::panic::AssertUnwindSafe;
-
 use crate::ast::BareDecl::*;
 use crate::ast::Selector;
 use crate::ast::Span;
@@ -54,7 +52,15 @@ impl From<LexError> for ParseError {
 type ParseResult<T> = Result<T, ParseError>;
 
 fn opthull(lhs: Option<Span>, rhs: Option<Span>) -> Option<Span> {
-    Some(Span::hull(lhs?, rhs?))
+    if let Some(l) = lhs {
+        if let Some(r) = rhs {
+            Some(Span::hull(l,r))
+        } else {
+            lhs
+        }
+    } else {
+        rhs
+    }
 }
 
 fn hull(lhs: Span, rhs: Span) -> Span {
@@ -141,6 +147,12 @@ impl<'s> Parser<'s> {
                 }
             }
         }
+    }
+
+    fn discard(&mut self, tok: Token) -> ParseResult<Loc> {
+        let expected = format!("{:?}", tok);
+        let (_,loc) : LocTok = self.consume(tok,&expected)?;
+        Ok(loc)
     }
 
     fn many<T>(&mut self, single: fn(&mut Self) -> ParseResult<Option<T>>) -> ParseResult<Vec<T>> {
@@ -304,9 +316,9 @@ impl<'s> Parser<'s> {
             match tok {
                 Marker(If) => {
                     // parse if-then-else
-                    let _: LocTok = self.consume(Marker(ParenOpen), "(")?;
+                    let _: LocTok = self.consume(Marker(ParenOpen), "'('")?;
                     let cond = self.exp()?;
-                    let _: LocTok = self.consume(Marker(ParenClose), ")")?;
+                    let _: LocTok = self.consume(Marker(ParenClose), "')'")?;
                     let (then, thenspan) = self.compound()?;
                     let (alt, endspan) = if let Some(Marker(Else)) = self.peektok()? {
                         self.nexttok();
@@ -318,18 +330,27 @@ impl<'s> Parser<'s> {
                 }
                 Marker(WhileTok) => {
                     // parse while
-                    let _: LocTok = self.consume(Marker(ParenOpen), "(")?;
+                    let _: LocTok = self.consume(Marker(ParenOpen), "'('")?;
                     let cond = self.exp()?;
-                    let _: LocTok = self.consume(Marker(ParenClose), ")")?;
+                    let _: LocTok = self.consume(Marker(ParenClose), "')'")?;
                     let (body, endspan) = self.compound()?;
                     Ok(Some((While(cond, body), Some(hull(startspan, endspan)))))
                 }
-                IdTok(id) => Ok(Some(self.assign_or_call((id, Some(startspan)))?)),
+                IdTok(id) => Ok(Some(self.assign_init_or_call((id, Some(startspan)))?)),
                 Marker(Var) => {
                     // parse untyped local var declaration
                     let (id, exp, endloc) = self.var_init()?;
                     Ok(Some((
                         Local((None, id, exp)),
+                        Some(hull(startspan, endloc.into())),
+                    )))
+                }
+                TypeTok(_) | Marker(BraceOpen) | Marker(BrackOpen) => {
+                    self.unpeektok(loctok)?;
+                    let t = self.non_id_type()?;
+                    let (id, exp, endloc) = self.var_init()?;
+                    Ok(Some((
+                        Local((Some(t), id, exp)),
                         Some(hull(startspan, endloc.into())),
                     )))
                 }
@@ -361,21 +382,60 @@ impl<'s> Parser<'s> {
         }
     }
 
-    // TODO: rename this to include possibility of this being a var init.
-    fn assign_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
-        todo!();
+    fn assign_init_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
+        use BareStmt::*;
+        use tok::Misc::Assign as AssignTok;
+        if let Some(tok) = self.peektok()? {
+            match tok {
+                Marker(Dot) | Marker(AssignTok) => {
+                    let (field, _) = self.field()?;
+                    self.discard(Marker(AssignTok))?;
+                    let exp = self.exp()?;
+                    let endloc = self.discard(Marker(Semicolon))?;
+                    Ok((Assign(id,field,exp),opthull(id.1, Some(endloc.into()))))
+                }
+                Marker(ParenOpen) => {
+                    let (args,endspan) = self.tuplish(Self::exp)?;
+                    Ok((Call(id,args),opthull(id.1,Some(endspan))))
+                }
+                IdTok(_) => {
+                    let (vname,exp,endloc) = self.var_init()?;
+                    Ok((Local((Some((BareType::Typename(id.0),id.1)),vname,exp)),opthull(id.1,Some(endloc.into()))))
+                }
+                _ => unexpected(self.peekloctok().unwrap().unwrap().to_owned(), "'.', '=', '(' or identifier".to_owned()),
+            }
+        } else {
+            eof("'.', '=', '(', or identifier".to_owned())
+        }
     }
 
     fn compound(&mut self) -> ParseResult<(Vec<Stmt>, Span)> {
-        todo!();
+        let startspan = self.discard(Marker(BraceOpen))?.into();
+        let stmts = self.many(Self::stmt)?;
+        let endspan = self.discard(Marker(BraceClose))?.into();
+        Ok((stmts,hull(startspan,endspan)))
     }
 
-    fn selector(&mut self) -> ParseResult<Selector> {
-        todo!();
+    fn selector(&mut self) -> ParseResult<Option<Selector>> {
+        if let Some((Marker(Dot),startloc)) = self.peekloctok()? {
+            let startspan = startloc.to_owned().into();
+            self.nexttok();
+            let loctok = self.sometok("'hd', 'tl', 'fst', or 'snd'")?;
+            if let (Selector(sel),endloc) = loctok {
+                Ok(Some((sel,Some(hull(startspan,endloc.into())))))
+            } else {
+                unexpected(loctok, "'hd', 'tl', 'fst', or 'snd'".to_owned())
+            }
+        } else {
+            Ok(None)
+        }
     }
 
-    fn field(&mut self) -> ParseResult<(Vec<Selector>, Span)> {
-        todo!()
+    fn field(&mut self) -> ParseResult<(Vec<Selector>, Option<Span>)> {
+        let selectors = self.many(Self::selector)?;
+        let startspan = selectors.first().map(|x| x.1).flatten();
+        let endspan = selectors.last().map(|x| x.1).flatten();
+        Ok((selectors,opthull(startspan,endspan)))
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
@@ -414,7 +474,7 @@ impl<'s> Parser<'s> {
                 }
                 _ => {
                     let (fld, end) = self.field()?;
-                    Ok(((Var(id, fld), None), opthull(id.1, Some(end))))
+                    Ok(((Var(id, fld), None), opthull(id.1, end)))
                 }
             },
         }

@@ -15,22 +15,23 @@ NonIdType = BType | Tuplish_Type | '[' Typ ']'
 BType = 'Int' | 'Bool' | 'Char' | 'Void'
 Stmt = 'if' '(' Exp ')' Compound [ 'else' Compound ]
  | 'while '(' Exp ')' Compound
- | id AssignOrCall
+ | id AssignInitOrCall
  | 'var' VarInit
+ | NonIdType VarInit          {peek in {'Int','Bool','Char','Void','(','['}}
  | 'return' [ Exp ] ';'
-AssignOrCall = 
-   Field '=' Exp ';'           {peek in {'.','='}}
- | Tuplish_Exp ';'             {peek in {'('}}
- | VarInit                     {peek in {id}}
+AssignInitOrCall = 
+   Field '=' Exp ';'          {peek in {'.','='}}
+ | Tuplish_Exp ';'            {peek in {'('}}
+ | VarInit                    {peek in {id}}
 Compound = '{' Stmt* '}'
-Selector = 'hd' | 'tl' | 'fst' | 'snd'
-Field = ('.' Selector)*
+Selector = '.' ('hd' | 'tl' | 'fst' | 'snd')
+Field = Selector*
 Exp = Arith_top
 Atom = id FieldOrCall
  | int | char | 'False' | 'True' | '[]'
- | Tuplish_Exp                       {peek in {'('}}
-FieldOrCall = Field             {peek in <otherwise> }
-            | Tuplish_Exp       {peek in {'('}}
+ | Tuplish_Exp                {peek in {'('}}
+FieldOrCall = Field           {peek in <otherwise> }
+            | Tuplish_Exp     {peek in {'('}}
 Tuplish_a = '(' [ a ( ',' a )* ] ')'
 
 

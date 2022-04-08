@@ -79,7 +79,7 @@ pub type Stmt = Spanned<BareStmt>;
 pub enum BareStmt {
     ITE(Exp, Vec<Stmt>, Vec<Stmt>),
     While(Exp, Vec<Stmt>),
-    Assign(Id, Exp),
+    Assign(Id, Vec<Selector>, Exp),
     Call(Id, Vec<Exp>),
     Ret(Option<Exp>),
     Local(VarDecl),
