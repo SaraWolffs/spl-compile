@@ -6,6 +6,7 @@ use std::mem::size_of;
 
 mod ast;
 mod parser;
+mod pretty;
 
 fn main() {
     println!("Hello, world!");

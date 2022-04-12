@@ -96,6 +96,7 @@ pub enum BareType {
     Typename(BareId),
     Tuple(Vec<Type>),
     List(Box<Type>),
+    Typevar(u32),
 }
 
 pub type Typed<T> = (T, Option<Type>);
