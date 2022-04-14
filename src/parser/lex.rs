@@ -273,8 +273,11 @@ impl Iterator for Lex<'_> {
                 Ok(c) => c,
                 Err(msg) => fail!(msg, self.loc),
             },
-            '-' => match self.chars.peek().copied() {
-                Some((_, '>')) => Arrow.to_ltok(self.loc),
+            '-' => match self.ipeek() {
+                Some('>') => {
+                    self.step();
+                    Arrow.to_ltok(self.loc)
+                }
                 _ => Minus.to_ltok(self.loc),
             },
             '/' => match self.step_ch() {

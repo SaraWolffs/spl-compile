@@ -2,6 +2,9 @@ mod lex;
 mod shunting_yard;
 mod tok;
 
+use std::fmt;
+use std::fmt::Display;
+
 use crate::ast::BareDecl::*;
 use crate::ast::Selector;
 use crate::ast::Span;
@@ -41,7 +44,17 @@ macro_rules! ipe {
 }
 
 #[derive(PartialEq, Eq, Debug, Clone)]
-struct ParseError(String, Option<tok::Loc>);
+pub struct ParseError(String, Option<tok::Loc>);
+
+impl Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        if let Some(loc) = self.1 {
+            write!(f, "{} at {}", self.0, loc)
+        } else {
+            write!(f, "{}", self.0)
+        }
+    }
+}
 
 impl From<LexError> for ParseError {
     fn from(err: LexError) -> Self {
@@ -49,12 +62,12 @@ impl From<LexError> for ParseError {
     }
 }
 
-type ParseResult<T> = Result<T, ParseError>;
+pub type ParseResult<T> = Result<T, ParseError>;
 
 fn opthull(lhs: Option<Span>, rhs: Option<Span>) -> Option<Span> {
     if let Some(l) = lhs {
         if let Some(r) = rhs {
-            Some(Span::hull(l,r))
+            Some(Span::hull(l, r))
         } else {
             lhs
         }
@@ -89,10 +102,18 @@ fn lexfail<T>(err: LexError) -> ParseResult<T> {
 }
 
 impl<'s> Parser<'s> {
-    fn new(source: &'s str) -> Self {
+    pub fn new(source: &'s str) -> Self {
         Self {
             ts: Lex::lex(source),
         }
+    }
+
+    pub fn names(&self) -> &Vec<&'s str> {
+        &self.ts.names
+    }
+
+    pub fn to_names(self) -> Vec<&'s str> {
+        self.ts.names
     }
 
     fn nexttok(&mut self) -> Option<<Lex as Iterator>::Item> {
@@ -151,7 +172,7 @@ impl<'s> Parser<'s> {
 
     fn discard(&mut self, tok: Token) -> ParseResult<Loc> {
         let expected = format!("{:?}", tok);
-        let (_,loc) : LocTok = self.consume(tok,&expected)?;
+        let (_, loc): LocTok = self.consume(tok, &expected)?;
         Ok(loc)
     }
 
@@ -383,8 +404,8 @@ impl<'s> Parser<'s> {
     }
 
     fn assign_init_or_call(&mut self, id: Id) -> ParseResult<Stmt> {
-        use BareStmt::*;
         use tok::Misc::Assign as AssignTok;
+        use BareStmt::*;
         if let Some(tok) = self.peektok()? {
             match tok {
                 Marker(Dot) | Marker(AssignTok) => {
@@ -392,17 +413,23 @@ impl<'s> Parser<'s> {
                     self.discard(Marker(AssignTok))?;
                     let exp = self.exp()?;
                     let endloc = self.discard(Marker(Semicolon))?;
-                    Ok((Assign(id,field,exp),opthull(id.1, Some(endloc.into()))))
+                    Ok((Assign(id, field, exp), opthull(id.1, Some(endloc.into()))))
                 }
                 Marker(ParenOpen) => {
-                    let (args,endspan) = self.tuplish(Self::exp)?;
-                    Ok((Call(id,args),opthull(id.1,Some(endspan))))
+                    let (args, endspan) = self.tuplish(Self::exp)?;
+                    Ok((Call(id, args), opthull(id.1, Some(endspan))))
                 }
                 IdTok(_) => {
-                    let (vname,exp,endloc) = self.var_init()?;
-                    Ok((Local((Some((BareType::Typename(id.0),id.1)),vname,exp)),opthull(id.1,Some(endloc.into()))))
+                    let (vname, exp, endloc) = self.var_init()?;
+                    Ok((
+                        Local((Some((BareType::Typename(id.0), id.1)), vname, exp)),
+                        opthull(id.1, Some(endloc.into())),
+                    ))
                 }
-                _ => unexpected(self.peekloctok().unwrap().unwrap().to_owned(), "'.', '=', '(' or identifier".to_owned()),
+                _ => unexpected(
+                    self.peekloctok().unwrap().unwrap().to_owned(),
+                    "'.', '=', '(' or identifier".to_owned(),
+                ),
             }
         } else {
             eof("'.', '=', '(', or identifier".to_owned())
@@ -413,16 +440,16 @@ impl<'s> Parser<'s> {
         let startspan = self.discard(Marker(BraceOpen))?.into();
         let stmts = self.many(Self::stmt)?;
         let endspan = self.discard(Marker(BraceClose))?.into();
-        Ok((stmts,hull(startspan,endspan)))
+        Ok((stmts, hull(startspan, endspan)))
     }
 
     fn selector(&mut self) -> ParseResult<Option<Selector>> {
-        if let Some((Marker(Dot),startloc)) = self.peekloctok()? {
+        if let Some((Marker(Dot), startloc)) = self.peekloctok()? {
             let startspan = startloc.to_owned().into();
             self.nexttok();
             let loctok = self.sometok("'hd', 'tl', 'fst', or 'snd'")?;
-            if let (Selector(sel),endloc) = loctok {
-                Ok(Some((sel,Some(hull(startspan,endloc.into())))))
+            if let (Selector(sel), endloc) = loctok {
+                Ok(Some((sel, Some(hull(startspan, endloc.into())))))
             } else {
                 unexpected(loctok, "'hd', 'tl', 'fst', or 'snd'".to_owned())
             }
@@ -435,7 +462,7 @@ impl<'s> Parser<'s> {
         let selectors = self.many(Self::selector)?;
         let startspan = selectors.first().map(|x| x.1).flatten();
         let endspan = selectors.last().map(|x| x.1).flatten();
-        Ok((selectors,opthull(startspan,endspan)))
+        Ok((selectors, opthull(startspan, endspan)))
     }
 
     fn exp(&mut self) -> ParseResult<Exp> {
@@ -511,6 +538,13 @@ impl<'s> Parser<'s> {
                 }
             }
         }
+    }
+}
+
+impl<'s> Iterator for Parser<'s> {
+    type Item = ParseResult<Decl>;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.decl().transpose()
     }
 }
 
