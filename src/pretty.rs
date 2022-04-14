@@ -71,22 +71,25 @@ impl fmt::Display for BareSelector {
 
 pub struct ShowConfig<'s> {
     names: Vec<&'s str>,
-    tab: String,
+    lntab: String,
     tabwidth: usize,
 }
 
 impl<'s> ShowConfig<'s> {
-    fn new(names: Vec<&'s str>) -> Self {
+    pub fn new(names: Vec<&'s str>) -> Self {
         let tabwidth = 4;
         Self {
             names: names,
-            tab: itertools::join(std::iter::once(" ").cycle().take(tabwidth), ""),
+            lntab: itertools::join(
+                std::iter::once("\n").chain(std::iter::once(" ").cycle().take(tabwidth)),
+                "",
+            ),
             tabwidth: tabwidth,
         }
     }
 }
 
-trait InternedShow {
+pub trait InternedShow {
     fn show(&self, cfg: &ShowConfig) -> String;
 }
 
@@ -255,7 +258,7 @@ impl InternedShow for BareDecl {
                 } else {
                     "".to_owned()
                 },
-                body.show(cfg)
+                indent(body.show(cfg), cfg)
             ),
         }
     }
@@ -269,6 +272,12 @@ impl InternedShow for BareFunType {
             itertools::join(argtypes.iter().map(|x| x.show(cfg)), " "),
             rettype.show(cfg)
         )
+    }
+}
+
+impl InternedShow for SPL {
+    fn show(&self, cfg: &ShowConfig) -> String {
+        itertools::join(self.iter().map(|x| x.show(cfg)), "\n\n")
     }
 }
 
@@ -288,11 +297,16 @@ fn smart_parenthesise(
     cfg: &ShowConfig,
 ) -> String {
     // TODO: make this not emit superfluous parentheses
-    format!("({}){}({})", l.show(cfg), o.show(cfg), r.show(cfg))
+    format!("({}) {} ({})", l.show(cfg), o.show(cfg), r.show(cfg))
 }
 
 fn indent(s: String, cfg: &ShowConfig) -> String {
-    itertools::join(std::iter::once::<&str>(&cfg.tab).chain(s.lines()), &cfg.tab)
+    // itertools::join(std::iter::once::<&str>(&cfg.tab).chain(s.lines()), &cfg.tab)
+    format!(
+        "{}{}",
+        &cfg.lntab[1..],
+        (str::replace(&s, "\n", &cfg.lntab))
+    )
 }
 
 // fn commasep<T>(v: T, cfg: &ShowConfig) -> String

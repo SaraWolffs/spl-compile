@@ -1,3 +1,5 @@
+use std::fmt::{self, Display};
+
 use crate::ast::{BType, BareId, BareOp, BareSelector, LitVal};
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
@@ -22,6 +24,18 @@ impl Loc {
 
     pub fn step(&mut self) {
         self.len += 1;
+    }
+}
+
+impl Display for Loc {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "line {}, columns {}-{}",
+            self.line + 1,
+            self.col + 1,
+            self.col + self.len
+        )
     }
 }
 
