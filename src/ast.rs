@@ -53,7 +53,7 @@ pub type SPL = Vec<Decl>;
 
 pub type Decl = Spanned<BareDecl>;
 #[must_use]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BareDecl {
     Global(VarDecl),
     Fun(Id, Vec<Id>, Option<FunType>, Vec<Stmt>),
@@ -63,7 +63,7 @@ pub type VarDecl = (Option<Type>, Id, Exp);
 
 pub type Exp = Spanned<Typed<BareExp>>;
 #[must_use]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BareExp {
     Var(Id, Vec<Selector>),
     Call(Id, Vec<Exp>),
@@ -75,7 +75,7 @@ pub enum BareExp {
 
 pub type Stmt = Spanned<BareStmt>;
 #[must_use]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BareStmt {
     ITE(Exp, Vec<Stmt>, Vec<Stmt>),
     While(Exp, Vec<Stmt>),
@@ -90,7 +90,7 @@ pub type BareFunType = (Vec<Type>, Type);
 
 pub type Type = Spanned<BareType>;
 #[must_use]
-#[derive(Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq)]
 pub enum BareType {
     Lit(BType),
     Typename(BareId),
