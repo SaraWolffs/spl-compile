@@ -66,7 +66,7 @@ pub type Exp = Spanned<Typed<BareExp>>;
 #[derive(Clone, Debug, PartialEq)]
 pub enum BareExp {
     Var(Id, Vec<Selector>),
-    Call(Id, Vec<Exp>),
+    Call(Typed<Id>, Vec<Exp>),
     Lit(LitVal),
     Tuple(Vec<Exp>),
     BinOp(Op, Box<Exp>, Box<Exp>),
@@ -80,7 +80,7 @@ pub enum BareStmt {
     ITE(Exp, Vec<Stmt>, Vec<Stmt>),
     While(Exp, Vec<Stmt>),
     Assign(Id, Vec<Selector>, Exp),
-    Call(Id, Vec<Exp>),
+    Call(Typed<Id>, Vec<Exp>),
     Ret(Option<Exp>),
     Local(VarDecl),
 }
@@ -99,7 +99,7 @@ pub enum BareType {
     Typevar(u32),
 }
 
-pub type Typed<T> = (T, Option<Type>);
+pub type Typed<T> = (T, Option<BareType>);
 
 /** Terminal symbols/tokens **/
 pub type Id = Spanned<BareId>;

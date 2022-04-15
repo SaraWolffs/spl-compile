@@ -79,10 +79,15 @@ fn main() {
         size_of::<Option<Box<&str>>>(),
         size_of::<Type>()
     );
-    let mut parser = Parser::new(EXAMPLESPL);
-    let parseresult: Result<Vec<_>, _> = parser.by_ref().try_collect();
+    let mut example_p = Parser::new(EXAMPLESPL);
+    let parseresult: Result<Vec<_>, _> = example_p.by_ref().try_collect();
     match parseresult {
-        Ok(decls) => println!("{}", decls.show(&ShowConfig::new(parser.to_names()))),
+        Ok(decls) => println!(
+            "{}",
+            decls.show(&ShowConfig::new(example_p.names().clone()))
+        ),
         Err(perr) => println!("{}", format!("{perr}")),
     }
+    let g3 = "-9223372036854775810".parse::<i64>();
+    println!("{:?}", g3);
 }

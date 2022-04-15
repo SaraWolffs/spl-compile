@@ -417,7 +417,7 @@ impl<'s> Parser<'s> {
                 }
                 Marker(ParenOpen) => {
                     let (args, endspan) = self.tuplish(Self::exp)?;
-                    Ok((Call(id, args), opthull(id.1, Some(endspan))))
+                    Ok((Call((id, None), args), opthull(id.1, Some(endspan))))
                 }
                 IdTok(_) => {
                     let (vname, exp, endloc) = self.var_init()?;
@@ -497,7 +497,7 @@ impl<'s> Parser<'s> {
             Some((tok, _)) => match tok {
                 Marker(ParenOpen) => {
                     let (args, end) = self.tuplish(Self::exp)?;
-                    Ok(((Call(id, args), None), opthull(id.1, Some(end))))
+                    Ok(((Call((id, None), args), None), opthull(id.1, Some(end))))
                 }
                 _ => {
                     let (fld, end) = self.field()?;
@@ -686,7 +686,7 @@ mod tests {
         let test = p.exp();
         let foo = BareId(p.ts.names.iter().position(|&e| e == "foo").unwrap() as u32);
         let correct = Ok((
-            (Call((foo, tspan(0, 0, 0, 3)), Vec::new()), None),
+            (Call(((foo, tspan(0, 0, 0, 3)), None), Vec::new()), None),
             tspan(0, 0, 0, 5),
         ));
         assert_eq!(test, correct);

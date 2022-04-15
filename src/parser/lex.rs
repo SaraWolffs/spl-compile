@@ -299,7 +299,10 @@ impl Iterator for Lex<'_> {
                 if x.is_alphabetic() {
                     (self.parse_word(pos), self.loc)
                 } else if x.is_digit(10) {
-                    Int(self.parse_int(pos).unwrap()).to_ltok(self.loc)
+                    match self.parse_int(pos) {
+                        Ok(val) => Int(val).to_ltok(self.loc),
+                        Err(err) => fail!(err.to_string(), self.loc),
+                    }
                 } else if x.is_whitespace() {
                     return self.next();
                 } else {

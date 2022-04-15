@@ -281,21 +281,12 @@ impl InternedShow for SPL {
     }
 }
 
-fn smart_paren_un(
-    o: &(BareOp, Option<Span>),
-    e: &((BareExp, Option<(BareType, Option<Span>)>), Option<Span>),
-    cfg: &ShowConfig,
-) -> String {
+fn smart_paren_un(o: &Op, e: &Exp, cfg: &ShowConfig) -> String {
     // TODO: make this not emit superfluous parentheses
     format!("{}({})", o.show(cfg), e.show(cfg))
 }
 
-fn smart_parenthesise(
-    o: &(BareOp, Option<Span>),
-    l: &((BareExp, Option<(BareType, Option<Span>)>), Option<Span>),
-    r: &((BareExp, Option<(BareType, Option<Span>)>), Option<Span>),
-    cfg: &ShowConfig,
-) -> String {
+fn smart_parenthesise(o: &Op, l: &Exp, r: &Exp, cfg: &ShowConfig) -> String {
     // TODO: make this not emit superfluous parentheses
     format!("({}) {} ({})", l.show(cfg), o.show(cfg), r.show(cfg))
 }
